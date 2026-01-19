@@ -1,0 +1,36 @@
+/* ====== Tema oscuro (por defecto) ====== */
+:root{
+  --bg:#0b0f14;
+  --card:#0f1720;
+  --line:#1f2a37;
+  --text:#e5e7eb;
+  --muted:#93a4b1;
+  --header:#142033;
+  --row:#0f1720;
+  --row-alt:#0c141f;
+  --pill-bg:#0f1720;
+  --pill-border:#1f2a37;
+}
+
+/* Hace que inputs/selects/scrollbars nativos usen dark */
+html{ color-scheme: dark; }
+
+/* Base */
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;
+}
+
+/* Botones “píldora” que usamos en cabeceras/controles */
+.icon-btn{
+  border:1px solid var(--pill-border);
+  background:var(--pill-bg);
+  color:var(--text);
+  border-radius:999px;
+  padding:6px 10px;
+  cursor:pointer;
+}
+.icon-btn:hover{opacity:.9}

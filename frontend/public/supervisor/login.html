@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Supervisor | Login</title>
+
+  <!-- Estilos (rutas relativas, válidas con IP pública en HTTP) -->
+  <link rel="stylesheet" href="/css/common.css"/>
+  <link rel="stylesheet" href="/css/supervisor.css"/>
+
+  <style>
+    .login-body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      margin: 0;
+    }
+
+    .login-title {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    .login-error {
+      display: none;
+      margin-bottom: 1rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      background: #3b1a1a;
+      color: #ffb3b3;
+      text-align: center;
+    }
+
+    .login-form {
+      margin-top: 0.5rem;
+    }
+
+    .login-field {
+      width: 100%;
+      max-width: 260px;
+      margin: 0 auto 0.75rem auto;
+    }
+
+    .login-field label {
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+
+    .login-field input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .login-btn-full {
+      width: 100%;
+      background-color: #2d8cff;
+      color: #ffffff;
+      border: none;
+    }
+
+    .login-btn-full:hover {
+      filter: brightness(1.1);
+    }
+  </style>
+</head>
+<body data-theme="dark" class="login-body">
+  <main>
+    <section class="card login-card">
+      <h1 class="login-title">Acceso Supervisor</h1>
+
+      <div id="error" class="login-error"></div>
+
+      <!-- Sin action: hace POST a /supervisor/login -->
+      <form method="POST" class="login-form">
+        <div class="login-field">
+          <label for="codigo">Código de supervisor</label>
+          <input type="text" id="codigo" name="codigo" autocomplete="off" required />
+        </div>
+
+        <div class="login-field">
+          <button type="submit" class="btn login-btn-full">
+            Ingresar
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const e = params.get('e');
+      const logoutFlag = params.get('logout');
+      const errorBox = document.getElementById('error');
+
+      // Limpiar nombre del supervisor al hacer logout
+      if (logoutFlag === '1') {
+        sessionStorage.removeItem('supNombre');
+
+        // Opcional: limpiar el parámetro de la URL para no dejar ?logout=1
+        const url = new URL(window.location.href);
+        url.searchParams.delete('logout');
+        window.history.replaceState({}, '', url.pathname + url.search);
+      }
+
+      if (e === '1') {
+        errorBox.textContent = 'Ingrese su código de supervisor.';
+        errorBox.style.display = 'block';
+      } else if (e === '2') {
+        errorBox.textContent = 'Código inválido o no autorizado.';
+        errorBox.style.display = 'block';
+      } else if (e === '3') {
+        errorBox.textContent = 'Error interno. Intente nuevamente.';
+        errorBox.style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>

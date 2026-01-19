@@ -1,0 +1,363 @@
+/* =========================================
+   SUPERVISOR (dark + responsive / mobile-first)
+   Usa variables de /css/common.css
+   ========================================= */
+
+:root{
+  --accent:#60a5fa;
+  --accent-2:#3b82f6;
+  --sup-header-h:56px;      /* altura base del header */
+}
+
+/* en pantallas chicas dejamos más alto el header */
+@media (max-width: 768px){
+  :root{
+    --sup-header-h:80px;
+  }
+}
+
+/* Base tipográfica un poco más grande en móvil */
+html, body{
+  font-size: clamp(15px, 1.9vw, 16px);
+}
+.page {
+  max-width: 1200px;
+  margin: 16px auto;
+  padding: 0 12px;
+}
+
+/* --------- Tarjetas / contenedores --------- */
+.card{
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+/* --------- Grid principal --------- */
+.grid-2{
+  display:grid; gap:14px; grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 980px){ .grid-2{ grid-template-columns: 1fr; }}
+
+/* --------- Formulario compacto pero táctil --------- */
+.form-row{
+  display:grid; gap:10px;
+  grid-template-columns: repeat(6, minmax(160px,1fr));
+  align-items:end;
+}
+@media (max-width: 1024px){
+  .form-row{ grid-template-columns: repeat(3, minmax(160px,1fr)); }
+}
+@media (max-width: 640px){
+  .form-row{ grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 420px){
+  .form-row{ grid-template-columns: 1fr; }
+}
+.field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.field label{ font-size:.9rem; color:var(--muted); }
+.field input[type="text"],
+.field input[type="number"],
+.field input[type="datetime-local"],
+.field select{
+  width:100%; height:44px; /* objetivo táctil (se ajusta más abajo) */
+  border-radius:10px;
+  border:1px solid var(--line); background:var(--card); color:var(--text);
+  padding:0 12px; font-size:1rem;
+}
+.field input::placeholder{ color:var(--muted); }
+
+/* --------- Botones --------- */
+.btn{
+  height:44px; padding:0 14px; border-radius:10px; cursor:pointer;
+  border:1px solid var(--pill-border); background:var(--pill-bg); color:var(--text);
+  font-weight:700; font-size:1rem;
+}
+.btn:hover{ opacity:.95; }
+.btn.primary{ background:var(--accent); border-color:transparent; color:#fff; }
+.btn.ghost{ background:transparent; border-color:var(--line); }
+
+/* --------- Chips de resumen --------- */
+.pills{ display:flex; gap:8px; flex-wrap:wrap; margin: 8px 0 6px 0; }
+.pill{
+  display:inline-flex; align-items:center; gap:6px;
+  border:1px solid var(--pill-border); background:var(--pill-bg);
+  color:var(--text); padding:8px 12px; border-radius:999px;
+  font-size:clamp(.9rem, 2.6vw, 1rem);
+}
+
+/* --------- Títulos de bloque --------- */
+.block-title{ font-weight:800; margin: 8px 0 10px 0; font-size:1.05rem; }
+
+/* --------- Tablas accesibles --------- */
+.table-wrap{ border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.table-scroll{ max-height: 62vh; overflow:auto; } /* vertical */
+.table-hscroll{ overflow-x:auto; } /* horizontal en móviles estrechos */
+
+.table{
+  width:100%; border-collapse:collapse; font-size:clamp(.95rem, 2.5vw, 1rem);
+}
+.table thead th{
+  position: sticky; top: 0; z-index: 1;
+  text-align:left; padding:12px 12px; border-bottom:1px solid var(--line);
+  background:var(--header); color:var(--text); font-weight:800;
+}
+.table tbody td{
+  padding:12px 12px; border-top:1px solid var(--line);
+  background:var(--row);
+}
+.table tbody tr:nth-child(even) td{ background:var(--row-alt); }
+.table tfoot td{
+  padding:12px 12px; border-top:1px solid var(--line); color:var(--muted);
+}
+
+/* Celdas editables (Programación) */
+.editable{ outline:none; border-radius:8px; }
+.editable:focus{
+  box-shadow: 0 0 0 2px var(--accent) inset;
+  background: rgba(96,165,250,.12);
+}
+
+/* Acciones arriba a la derecha */
+.actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+
+/* Toolbar de Títulos */
+.toolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+.toolbar .grow{ flex:1; }
+.search{ width:100%; max-width:320px; }
+
+/* Utilidades */
+.muted{ color:var(--muted); }
+
+/* Ajustes extra para pantallas muy pequeñas */
+@media (max-width: 380px){
+  .pills{ gap:6px; }
+  .pill{ padding:6px 10px; }
+  .table thead th, .table tbody td{ padding:10px; }
+}
+
+/* =========================================
+   NAV HAMBURGUESA (siempre visible)
+   Compatible con /js/supervisor/nav.js
+   ========================================= */
+.sup-header{
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;         /* marca a la izq, usuario a la der */
+  gap: .75rem;
+  padding: 0 12px 6px;
+  min-height: var(--sup-header-h);        /* altura flexible */
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+/* contenedor del botón hamburguesa + texto "Supervisor" */
+.sup-header-left{
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+
+/* contenedor del nombre + botón cerrar sesión */
+.sup-user{
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  font-size: .9rem;
+  opacity: .9;
+  white-space: nowrap;
+}
+
+/* texto del nombre (con ... si se pasa) */
+.sup-name{
+  font-weight: 600;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* botón cerrar sesión, similar al de login */
+.sup-logout{
+  background: var(--accent-2);
+  border-color: transparent;
+  color: #fff;
+  font-size: .8rem;
+  padding: 0 14px;
+}
+
+/* comportamiento responsive del header */
+@media (max-width: 768px){
+  .sup-header{
+    flex-wrap: wrap;              /* permite que el nombre baje a segunda línea */
+    align-items: flex-start;
+  }
+
+  .sup-user{
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  .sup-name{
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .sup-logout{
+    padding: 0.3rem 0.75rem;
+    font-size: 0.75rem;
+  }
+}
+
+.hamburger{
+  display: flex;
+  flex-direction: column;
+  justify-content:center;
+  gap: 5px;
+  width:44px; height:44px;
+  padding: 8px 10px;
+  border: 1px solid var(--pill-border);
+  background: var(--pill-bg);
+  color: var(--text);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.hamburger span{
+  width: 22px; height: 2px;
+  background: var(--text);
+  border-radius:2px;
+  margin-left:2px;
+}
+
+/* El drawer se posiciona justo debajo del header usando la misma variable */
+.drawer{
+  position: fixed;
+  top: var(--sup-header-h);                 /* debajo del header */
+  left: -280px;
+  width: 280px;
+  height: calc(100vh - var(--sup-header-h));
+  background: var(--card);
+  border-right: 1px solid var(--line);
+  padding: 12px;
+  transition: left .25s ease;
+  z-index: 40;
+  overflow: auto;
+}
+.drawer.open{ left: 0; }
+
+.drawer a{
+  display: block;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--pill-border);
+  background: var(--pill-bg);
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer; /* ✅ clic/tap seguro */
+}
+.drawer a:hover{ background: var(--row-alt); }
+.drawer a.active{
+  outline: 2px solid #3b82f6;
+  background: rgba(59,130,246,.15);
+}
+
+/* Number sin flechas nativas */
+.field input[type="number"]::-webkit-outer-spin-button,
+.field input[type="number"]::-webkit-inner-spin-button{
+  -webkit-appearance: none;
+  margin: 0;
+}
+.field input[type="number"]{
+  appearance: textfield;       /* estándar */
+  -moz-appearance: textfield;  /* Firefox */
+}
+
+/* Estados disabled */
+.field input:disabled,
+.field select:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+}
+
+/* Mensaje junto al botón */
+.actions{ display:flex; gap:10px; align-items:center; }
+.actions .muted{ font-size:.95rem; }
+
+
+/* ===== Compactar la UI del formulario (Programación) ===== */
+
+/* Título del bloque + tarjeta */
+.card h3{ margin:0 0 8px; }
+.card{ padding:12px; }                 /* antes 14px */
+
+/* Grilla del formulario: menos separación, misma responsividad */
+.form-row{ gap:8px; align-items:center; }
+
+/* Campos: menos separación entre etiqueta y control */
+.field{ gap:4px; }
+
+/* Etiquetas más compactas */
+.field label{
+  font-size:.85rem;
+  line-height:1.1;
+  color:var(--muted);
+}
+
+/* Controles más bajos y con menos padding */
+.field input[type="text"],
+.field input[type="number"],
+.field input[type="datetime-local"],
+.field select{
+  height:40px;                          /* antes 44px */
+  padding:0 10px;                       /* antes 12px */
+  border-radius:8px;                    /* antes 10px */
+  font-size:.95rem;
+}
+
+/* Placeholders un poco más pequeños */
+.field input::placeholder{ font-size:.9rem; }
+
+/* Botón principal más compacto */
+.btn{
+  height:40px;                          /* antes 44px */
+  padding:0 12px;
+  border-radius:8px;
+  font-size:.95rem;
+}
+
+/* Ajustes extra para pantallas pequeñas */
+@media (max-width:480px){
+  .card{ padding:10px; }
+  .form-row{ gap:6px; }
+  .field input[type="text"],
+  .field input[type="number"],
+  .field input[type="datetime-local"],
+  .field select{ height:38px; padding:0 10px; }
+}
+
+.hidden { display: none !important; }
+
+
+/* Input inline dentro de la tabla al editar */
+.inline-dt{
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--pill-border);
+  background: var(--card);
+  color: var(--text);
+  padding: 0 10px;
+}
+td.editable input[type="datetime-local"]{
+  border:1px solid var(--accent);
+  background: rgba(96,165,250,.10);
+  border-radius:8px;
+  padding:6px 8px;
+  color: var(--text);
+}

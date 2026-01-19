@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <base href="/retorcidos/">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Operario | Resumen</title>
+  <link rel="stylesheet" href="/css/common.css"/>
+  <link rel="stylesheet" href="/css/operario.css"/>
+</head>
+<body data-theme="dark">
+  <div class="container">
+    <div class="card">
+      <!-- Controles -->
+      <div class="flex gap">
+        <label>
+          <span class="muted" style="display:block;font-size:.9rem">Máquina</span>
+          <select id="selMaquina"></select>
+        </label>
+        <button class="btn" id="btnRefresh" style="align-self:end">Refrescar</button>
+      </div>
+
+      <!-- Resumen compacto -->
+      <div class="mt1 pills" id="hdrRow">
+        <span class="pill">Título: <strong id="hdrTitulo">—</strong></span>
+        <span class="pill">Tiempo/descarga: <strong id="hdrTiempo">—</strong> min</span>
+        <span class="pill">OT: <strong id="hdrOT">—</strong></span>
+      </div>
+
+      <!-- Dos paneles lado A/B en paralelo -->
+      <div class="mt2 grid2">
+        <section class="panel">
+          <h3>Lado A</h3>
+          <div class="table-wrap">
+            <div class="table-scroll">
+              <table class="table">
+                <thead><tr><th>N</th><th>F. H. INICIO</th><th>F. H. FINAL</th></tr></thead>
+                <tbody id="tbPlanA"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h3>Lado B</h3>
+          <div class="table-wrap">
+            <div class="table-scroll">
+              <table class="table">
+                <thead><tr><th>N</th><th>F. H. INICIO</th><th>F. H. FINAL</th></tr></thead>
+                <tbody id="tbPlanB"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/operario/resumen.js"></script>
+</body>
+</html>

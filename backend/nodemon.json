@@ -1,0 +1,5 @@
+{
+  "watch": ["src"],
+  "ext": "js,json",
+  "exec": "node --trace-uncaught --trace-warnings ./src/server.js"
+}
