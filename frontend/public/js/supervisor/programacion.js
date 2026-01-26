@@ -14,8 +14,13 @@ const api = {
       body: JSON.stringify(body)
     });
     if (!r.ok) {
-      let msg = `HTTP ${r.status} POST ${url}`;
-      try { const j = await r.json(); if (j?.error) msg += ` — ${j.error}`; } catch { }
+      let msg = 'Ocurrió un error en la solicitud.';
+      try {
+        const j = await r.json();
+        if (j?.error) msg = j.error; // Usar mensaje directo del backend si existe
+      } catch {
+        msg = `Error de conexión (${r.status})`;
+      }
       throw new Error(msg);
     }
     return r.json();
@@ -206,7 +211,7 @@ async function crearProgramacion(ev) {
   } catch (e) {
     console.error('crearProgramacion ERR:', e);
     // Error típico cuando el trigger hace ROLLBACK por solape u otra regla
-    alert(e.message || 'No se pudo crear la programación.');
+    alert(e.message);
   } finally {
     btn.disabled = false;
   }

@@ -18,21 +18,6 @@ function getNowFaceValue() {
 }
 
 /* ---------------------- GET /api/programaciones/vigente ------------------- */
-/**
- * Devuelve el plan “vigente” (si hay alguno con fin futuro), o el último plan,
- * e incluye banderas para que el front sepa si la máquina/lado está ocupada.
- *
- * Query: ?maquina_id=&lado_id=
- * Respuesta:
- *  {
- *    ok: boolean,
- *    programacion_id: number|null,
- *    otcod: string|null,
- *    ultimo_fin: ISOString|null,
- *    ocupado: boolean,
- *    plan: [ { plan_descarga_id, secuencia, fh_inicio, fh_fin }, ... ]
- *  }
- */
 export const getPlanVigente = async (req, res) => {
   try {
     const maquina_id = parseInt(req.query.maquina_id, 10);
@@ -44,7 +29,6 @@ export const getPlanVigente = async (req, res) => {
     const pool = await getPool();
     const nowFace = getNowFaceValue();
 
-    // ¿Hay plan activo (alguna fila del plan con fin en el futuro)?
     const { recordset: act } = await pool.request()
       .input('maquina_id', sql.Int, maquina_id)
       .input('lado_id', sql.Int, lado_id)
@@ -70,7 +54,6 @@ export const getPlanVigente = async (req, res) => {
       otcod = act[0].otcod;
       ultimo_fin = act[0].ultimo_fin;
     } else {
-      // No hay activo: buscar el PRÓXIMO futuro (no el último pasado)
       const { recordset: next } = await pool.request()
         .input('maquina_id', sql.Int, maquina_id)
         .input('lado_id', sql.Int, lado_id)
@@ -122,12 +105,6 @@ export const getPlanVigente = async (req, res) => {
 };
 
 /* ------------------------ POST /api/programaciones ------------------------ */
-/**
- * Crea una programación y genera N filas en el plan.
- * – Verifica que la máquina/lado NO esté ocupada (ninguna fila con fin futuro).
- * – Inserta en plan sólo (fh_inicio_plan, minutos_plan). NO toca fh_fin_plan si es computada.
- * Body: { maquina_id, lado_id, otcod, titulo_id, fecha_hora_inicio, descargas_programadas }
- */
 export const crearProgramacion = async (req, res) => {
   const {
     maquina_id,
@@ -145,10 +122,37 @@ export const crearProgramacion = async (req, res) => {
   const pool = await getPool();
 
   try {
-    // 1) Validar solapamiento de rangos (Overlap)
-    // Necesitamos saber cuándo termina la NUEVA programación para ver si choca con algo.
+    // 0) Validar y Normalizar OT (Smart Search)
+    // El usuario puede digitar "OT36992" pero en BD es "OT00036992"
+    let otInput = otcod.trim().toUpperCase();
+    let otPadded = otInput;
 
-    // a) Obtener minutos título
+    // Si tiene formato OT + numeros, intentamos rellenar con ceros hasta 8 dígitos
+    const match = otInput.match(/^OT(\d+)$/);
+    if (match) {
+      const num = match[1];
+      // Asumimos 8 dígitos para el número (basado en OT00036371)
+      otPadded = 'OT' + num.padStart(8, '0');
+    }
+
+    const { recordset: otMatch } = await pool.request()
+      .input('otInput', sql.VarChar(25), otInput)
+      .input('otPadded', sql.VarChar(25), otPadded)
+      .query(`
+        SELECT TOP 1 otcod 
+        FROM Medidores_2023.dbo.VIEW_PRD_SCADA005 
+        WHERE LTRIM(RTRIM(otcod)) IN (@otInput, @otPadded)
+      `);
+
+    if (!otMatch.length) {
+      return res.status(400).json({
+        ok: false,
+        error: `La OT '${otInput}' (o '${otPadded}') no existe en el sistema.`
+      });
+    }
+    const otExacto = otMatch[0].otcod;
+
+    // 1) Validar solapamiento
     const { recordset: tit } = await pool.request()
       .input('titulo_id', sql.Int, titulo_id)
       .query(`SELECT minutos_por_descarga FROM dbo.RET_DGT_TITULOS WHERE titulo_id=@titulo_id;`);
@@ -160,16 +164,6 @@ export const crearProgramacion = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Minutos inválidos para el título' });
     }
 
-    // FIX TIMEZONE: Construir fecha en UTC preservando el valor facial (Face Value)
-    // Entrada: "2026-01-25T20:00" -> Queremos que sea 20:00 UTC para que se guarde 20:00 en BD
-    const d = new Date(fecha_hora_inicio);
-    // Nota: d.getFullYear() etc usan la zona local del servidor. 
-    // Si el servidor es UTC, new Date("...T20:00") es 20:00 UTC.
-    // Si el servidor es UTC-5, new Date("...T20:00") es 20:00 Local -> 01:00 UTC.
-    // Para evitar ambigüedad, parseamos el string manualmente o ajustamos.
-    // Mejor: Usamos los componentes del string directamente si viene en ISO.
-
-    // Asumimos formato ISO YYYY-MM-DDTHH:mm
     const parts = fecha_hora_inicio.split('T');
     const ymd = parts[0].split('-');
     const hm = parts[1].split(':');
@@ -186,8 +180,6 @@ export const crearProgramacion = async (req, res) => {
     const duracionTotal = n * mins;
     const fin = new Date(inicio.getTime() + duracionTotal * 60000);
 
-    // b) Query de solapamiento
-    // Existe alguna descarga tal que: (InicioExistente < FinNuevo) AND (FinExistente > InicioNuevo)
     const { recordset: overlap } = await pool.request()
       .input('maquina_id', sql.Int, maquina_id)
       .input('lado_id', sql.Int, lado_id)
@@ -205,7 +197,6 @@ export const crearProgramacion = async (req, res) => {
 
     if (overlap.length) {
       const o = overlap[0];
-      // Mensaje amigable para el usuario
       const iniStr = new Date(o.fh_inicio_plan).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
       const finStr = new Date(o.fh_fin_plan).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
 
@@ -216,16 +207,14 @@ export const crearProgramacion = async (req, res) => {
       });
     }
 
-    // 2) (El paso de obtener minutos ya se hizo arriba, lo reutilizamos)
-
-    // 3) Inserción con transacción. NO escribir fh_fin_plan si es computada.
+    // 3) Inserción con transacción
     const tx = new sql.Transaction(pool);
     await tx.begin();
 
     const rsProg = await new sql.Request(tx)
       .input('maquina_id', sql.Int, maquina_id)
       .input('lado_id', sql.Int, lado_id)
-      .input('otcod', sql.VarChar(25), otcod)
+      .input('otcod', sql.VarChar(25), otExacto)
       .input('titulo_id', sql.Int, titulo_id)
       .input('inicio', sql.DateTime, inicio)
       .input('desc', sql.Int, n)
@@ -264,11 +253,6 @@ export const crearProgramacion = async (req, res) => {
 };
 
 /* ------------------- PUT /api/programaciones/plan/:id --------------------- */
-/**
- * Edita el fh_inicio_plan de una fila (id) y recalcula en cascada.
- * Body: { fh_inicio_plan: ISOString }
- * No escribe fh_fin_plan si es computada.
- */
 export const editarPlanFila = async (req, res) => {
   const id = parseInt(req.params.plan_descarga_id, 10);
   const { fh_inicio_plan } = req.body || {};
@@ -300,7 +284,6 @@ export const editarPlanFila = async (req, res) => {
     const mins = parseInt(minutos_por_descarga, 10);
     let curIni = new Date(fh_inicio_plan);
 
-    // 1) Actualiza la fila editada (SOLO inicio)
     await new sql.Request(tx)
       .input('id', sql.Int, id)
       .input('ini', sql.DateTime, curIni)
@@ -310,7 +293,6 @@ export const editarPlanFila = async (req, res) => {
         WHERE plan_descarga_id=@id;
       `);
 
-    // 2) Recalcula filas siguientes
     const { recordset: siguientes } = await new sql.Request(tx)
       .input('programacion_id', sql.Int, programacion_id)
       .input('secuencia', sql.Int, secuencia)
@@ -352,12 +334,10 @@ export const deleteProgramacion = async (req, res) => {
   try {
     await tx.begin();
 
-    // 1) Borrar detalle
     await new sql.Request(tx)
       .input('id', sql.Int, id)
       .query('DELETE FROM dbo.RET_DGT_PLAN_DESCARGAS WHERE programacion_id=@id');
 
-    // 2) Borrar cabecera
     await new sql.Request(tx)
       .input('id', sql.Int, id)
       .query('DELETE FROM dbo.RET_DGT_PROGRAMACIONES WHERE programacion_id=@id');
@@ -379,8 +359,6 @@ export const getProgramacionesActivas = async (req, res) => {
 
   try {
     const pool = await getPool();
-    // Traer programaciones que tengan al menos una descarga futura (o que sean recientes)
-    // Para simplificar: traemos las que tienen fin > NOW
     const nowFace = getNowFaceValue();
     const { recordset } = await pool.request()
       .input('maquina_id', sql.Int, maquina_id)
