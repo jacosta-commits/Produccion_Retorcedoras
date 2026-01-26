@@ -15,7 +15,7 @@ const api = {
     });
     if (!r.ok) {
       let msg = `HTTP ${r.status} POST ${url}`;
-      try { const j = await r.json(); if (j?.error) msg += ` — ${j.error}`; } catch {}
+      try { const j = await r.json(); if (j?.error) msg += ` — ${j.error}`; } catch { }
       throw new Error(msg);
     }
     return r.json();
@@ -23,72 +23,72 @@ const api = {
 };
 
 /* ---------- helpers fecha ---------- */
-const pad = n => String(n).padStart(2,'0');
+const pad = n => String(n).padStart(2, '0');
 const toLocalInputValue = (dt) => {
   const d = (dt instanceof Date) ? dt : new Date(dt);
-  d.setSeconds(0,0);
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  d.setSeconds(0, 0);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 const fmtFull = (dt) => {
   const d = (dt instanceof Date) ? dt : new Date(dt);
-  return d.toLocaleString('es-PE',{ day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  return d.toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 const getStart = r => r.fh_inicio ?? r.fh_inicio_plan ?? null;
-const getEnd   = r => r.fh_fin    ?? r.fh_fin_plan    ?? null;
+const getEnd = r => r.fh_fin ?? r.fh_fin_plan ?? null;
 
 /* ---------- estado compartido ---------- */
 let ULTIMO_FIN = null;   // Date del último fin para la máquina/lado seleccionado
 let MIN_X_DESC = null;   // minutos por descarga del título seleccionado (solo para mostrar)
 
 /* ---------- carga de maestros ---------- */
-async function loadMaestros(){
+async function loadMaestros() {
   // máquinas
   const maq = await api.get('/api/maestros/maquinas');
-  const sM = $('#maquina_id'); sM.innerHTML='';
-  maq.forEach(m=>{
-    const o=document.createElement('option');
-    o.value=m.maquina_id; o.textContent=m.nombre||m.codigo;
+  const sM = $('#maquina_id'); sM.innerHTML = '';
+  maq.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.maquina_id; o.textContent = m.nombre || m.codigo;
     sM.appendChild(o);
   });
 
   // lados
   const lados = await api.get('/api/maestros/lados');
-  const sL = $('#lado_id'); sL.innerHTML='';
-  lados.forEach(l=>{
-    const o=document.createElement('option');
-    o.value=l.lado_id; o.textContent=l.nombre;
+  const sL = $('#lado_id'); sL.innerHTML = '';
+  lados.forEach(l => {
+    const o = document.createElement('option');
+    o.value = l.lado_id; o.textContent = l.nombre;
     sL.appendChild(o);
   });
 
   // títulos
   const tit = await api.get('/api/titulos');
-  const sT = $('#titulo_id'); sT.innerHTML='';
-  tit.forEach(t=>{
-    const o=document.createElement('option');
-    o.value=t.titulo_id; o.textContent=`${t.nombre} (${t.minutos_por_descarga} min)`;
+  const sT = $('#titulo_id'); sT.innerHTML = '';
+  tit.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.titulo_id; o.textContent = `${t.nombre} (${t.minutos_por_descarga} min)`;
     o.dataset.min = t.minutos_por_descarga;
     sT.appendChild(o);
   });
   // cachea minutos x descarga del seleccionado
-  $('#titulo_id').addEventListener('change', ()=>{
+  $('#titulo_id').addEventListener('change', () => {
     const opt = $('#titulo_id').selectedOptions[0];
-    MIN_X_DESC = opt ? parseInt(opt.dataset.min,10) || null : null;
+    MIN_X_DESC = opt ? parseInt(opt.dataset.min, 10) || null : null;
   });
   if (sT.options.length) {
     const opt = sT.options[sT.selectedIndex];
-    MIN_X_DESC = opt ? parseInt(opt.dataset.min,10) || null : null;
+    MIN_X_DESC = opt ? parseInt(opt.dataset.min, 10) || null : null;
   }
 }
 
 /* ---------- estado libre/ocupado + ULTIMO_FIN ---------- */
-async function checkLibre(){
+async function checkLibre() {
   const maquina_id = $('#maquina_id').value;
-  const lado_id    = $('#lado_id').value;
-  const badge      = $('#lblPlanVigente');
-  const btn        = $('#btnCrear');
-  const inpInicio  = $('#inicio');
+  const lado_id = $('#lado_id').value;
+  const badge = $('#lblPlanVigente');
+  const btn = $('#btnCrear');
+  const inpInicio = $('#inicio');
 
-  try{
+  try {
     const r = await api.get(`/api/programaciones/vigente?maquina_id=${maquina_id}&lado_id=${lado_id}`);
 
     // r.ok === false => no hay nada
@@ -100,7 +100,7 @@ async function checkLibre(){
       // min del input: ahora
       const now = new Date();
       inpInicio.min = toLocalInputValue(now);
-      return { libre:true };
+      return { libre: true };
     }
 
     // Interpretamos respuesta estándar (ocupado, ultimo_fin, otcod...)
@@ -109,7 +109,7 @@ async function checkLibre(){
 
     if (r.ocupado) {
       badge.textContent = `Plan vigente: OT ${r.otcod ?? ''} · hasta ${last ? fmtFull(last) : '—'}`;
-      btn.disabled = true;
+      // btn.disabled = true; // Permitimos crear si es futuro (validación en backend)
     } else {
       // Libre, pero puede existir un plan futuro → marcamos desde cuándo
       if (ULTIMO_FIN) {
@@ -120,40 +120,40 @@ async function checkLibre(){
       btn.disabled = false;
     }
 
-    // Coloca un mínimo en el input para evitar iniciar antes de ULTIMO_FIN
-    const minInicio = (ULTIMO_FIN && !isNaN(ULTIMO_FIN)) ? ULTIMO_FIN : new Date();
+    // Coloca un mínimo en el input para evitar iniciar antes de AHORA (permitir huecos)
+    const minInicio = new Date();
     inpInicio.min = toLocalInputValue(minInicio);
 
-    // si el valor actual es menor al mínimo, lo reajustamos
+    // si el valor actual es menor al mínimo (pasado), lo reajustamos
     const v = inpInicio.value ? new Date(inpInicio.value) : null;
     if (!v || (v < minInicio)) {
       inpInicio.value = toLocalInputValue(minInicio);
     }
 
     return { libre: !r.ocupado, last: ULTIMO_FIN, ot: r.otcod };
-  }catch(e){
+  } catch (e) {
     console.error(e);
     badge.textContent = '—';
     btn.disabled = false;
     ULTIMO_FIN = null;
-    return { libre:true };
+    return { libre: true };
   }
 }
 
 /* ---------- render plan generado ---------- */
-function renderPlan(plan){
+function renderPlan(plan) {
   const card = $('#cardPlan');
   const tb = $('#tbPlan');
   const fechaLbl = $('#planFecha');
 
   tb.innerHTML = '';
   const rows = plan || [];
-  if(!rows.length){ card.hidden=true; return; }
+  if (!rows.length) { card.hidden = true; return; }
 
   const first = rows[0]?.fh_inicio ?? rows[0]?.fh_inicio_plan;
   fechaLbl.textContent = first ? fmtFull(first) : '—';
 
-  rows.forEach(r=>{
+  rows.forEach(r => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${r.secuencia ?? ''}</td>
@@ -166,7 +166,7 @@ function renderPlan(plan){
 }
 
 /* ---------- submit ---------- */
-async function crearProgramacion(ev){
+async function crearProgramacion(ev) {
   ev.preventDefault();
   const btn = $('#btnCrear');
   btn.disabled = true;
@@ -174,28 +174,21 @@ async function crearProgramacion(ev){
   const inicio = new Date($('#inicio').value);
   const body = {
     maquina_id: parseInt($('#maquina_id').value, 10),
-    lado_id:    parseInt($('#lado_id').value, 10),
-    otcod:      $('#otcod').value.trim(),
-    titulo_id:  parseInt($('#titulo_id').value, 10),
-    fecha_hora_inicio: inicio.toISOString(),
+    lado_id: parseInt($('#lado_id').value, 10),
+    otcod: $('#otcod').value.trim(),
+    titulo_id: parseInt($('#titulo_id').value, 10),
+    // Enviar la hora local tal cual (YYYY-MM-DDTHH:mm) para evitar conversión a UTC (+5h)
+    fecha_hora_inicio: $('#inicio').value,
     descargas_programadas: parseInt($('#desc').value, 10)
   };
 
-  try{
-    // 1) Defensa en cliente: no iniciar antes de ULTIMO_FIN
-    if (ULTIMO_FIN && inicio < ULTIMO_FIN) {
-      alert(`La máquina/lado tiene programaciones hasta ${fmtFull(ULTIMO_FIN)}. Debes iniciar desde esa fecha/hora o después.`);
-      btn.disabled = false;
-      return;
-    }
+  try {
+    // 1) Defensa en cliente: ELIMINADA para permitir huecos.
+    // La validación real de solapamiento la hace el backend.
 
-    // 2) Re-chequeo de “libre” justo antes de enviar (condición de carrera)
-    const st = await checkLibre();
-    if (!st.libre && st.last && inicio < st.last) {
-      alert(`La máquina/lado aún tiene un plan vigente hasta ${fmtFull(st.last)}.`);
-      btn.disabled = false;
-      return;
-    }
+    // 2) Re-chequeo de “libre” (opcional, pero ya no bloqueante por fecha final)
+    // const st = await checkLibre(); 
+    // (Ya no bloqueamos aquí)
 
     // 3) Crear
     await api.post('/api/programaciones', body);
@@ -204,26 +197,26 @@ async function crearProgramacion(ev){
     const v = await api.get(`/api/programaciones/vigente?maquina_id=${body.maquina_id}&lado_id=${body.lado_id}`);
     renderPlan(v?.plan || []);
     $('#msg').textContent = 'OK';
-  }catch(e){
+  } catch (e) {
     console.error('crearProgramacion ERR:', e);
     // Error típico cuando el trigger hace ROLLBACK por solape u otra regla
     alert(e.message || 'No se pudo crear la programación.');
-  }finally{
+  } finally {
     btn.disabled = false;
   }
 }
 
 /* ---------- init ---------- */
-document.addEventListener('DOMContentLoaded', async ()=>{
+document.addEventListener('DOMContentLoaded', async () => {
   await loadMaestros();
 
   // defaults
   if ($('#maquina_id').options.length) $('#maquina_id').selectedIndex = 0;
-  if ($('#lado_id').options.length)    $('#lado_id').selectedIndex = 0;
-  if ($('#titulo_id').options.length)  $('#titulo_id').selectedIndex = 0;
+  if ($('#lado_id').options.length) $('#lado_id').selectedIndex = 0;
+  if ($('#titulo_id').options.length) $('#titulo_id').selectedIndex = 0;
 
   // fecha por defecto
-  const now = new Date(); now.setSeconds(0,0);
+  const now = new Date(); now.setSeconds(0, 0);
   $('#inicio').value = toLocalInputValue(now);
 
   // eventos

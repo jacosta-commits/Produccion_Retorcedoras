@@ -103,27 +103,51 @@
       const e = params.get('e');
       const logoutFlag = params.get('logout');
       const errorBox = document.getElementById('error');
+      const form = document.querySelector('form');
+      const input = document.getElementById('codigo');
 
-      // Limpiar nombre del supervisor al hacer logout
+      // 1. Manejo de Logout
       if (logoutFlag === '1') {
         sessionStorage.removeItem('supNombre');
-
-        // Opcional: limpiar el parámetro de la URL para no dejar ?logout=1
+        localStorage.removeItem('supCode'); // Borrar credencial guardada
+        
+        // Limpiar URL
         const url = new URL(window.location.href);
         url.searchParams.delete('logout');
         window.history.replaceState({}, '', url.pathname + url.search);
       }
 
+      // 2. Manejo de Errores
       if (e === '1') {
         errorBox.textContent = 'Ingrese su código de supervisor.';
         errorBox.style.display = 'block';
       } else if (e === '2') {
         errorBox.textContent = 'Código inválido o no autorizado.';
         errorBox.style.display = 'block';
+        localStorage.removeItem('supCode'); // Si falló, borrar lo guardado
       } else if (e === '3') {
         errorBox.textContent = 'Error interno. Intente nuevamente.';
         errorBox.style.display = 'block';
       }
+
+      // 3. Auto-Login (Si no hubo error ni logout explícito)
+      if (!e && !logoutFlag) {
+        const savedCode = localStorage.getItem('supCode');
+        if (savedCode) {
+          input.value = savedCode;
+          // Pequeño delay visual o directo
+          form.submit();
+        }
+      }
+
+      // 4. Guardar al enviar
+      form.addEventListener('submit', () => {
+        const val = input.value.trim();
+        if (val) {
+          localStorage.setItem('supCode', val);
+        }
+      });
+
     })();
   </script>
 </body>

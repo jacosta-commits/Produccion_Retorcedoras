@@ -1,14 +1,15 @@
 <!doctype html>
 <html lang="es">
+
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="utf-8" />
   <base href="/retorcidos/">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Supervisor | Resumen</title>
 
   <!-- Estilos (rutas relativas, válidas con IP pública en HTTP) -->
-  <link rel="stylesheet" href="/css/common.css"/>
-  <link rel="stylesheet" href="/css/supervisor.css"/>
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/supervisor.css" />
 
   <!-- Ajustes del header: nombre a la derecha + botón logout -->
   <style>
@@ -89,12 +90,13 @@
     }
   </style>
 </head>
+
 <body data-theme="dark">
   <!-- Header + Drawer -->
   <header class="sup-header">
     <div class="sup-header-left">
-      <button id="menuBtn" type="button" class="hamburger"
-              aria-controls="supMenu" aria-expanded="false" aria-label="Abrir menú">
+      <button id="menuBtn" type="button" class="hamburger" aria-controls="supMenu" aria-expanded="false"
+        aria-label="Abrir menú">
         <span></span><span></span><span></span>
       </button>
       <div class="brand">Supervisor</div>
@@ -129,8 +131,27 @@
         </div>
       </div>
 
+      <!-- Lista de Programaciones Activas -->
+      <div id="secProgramaciones" class="mt2" style="display:none">
+        <h3>Programaciones Activas</h3>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>OT</th>
+                <th>Título</th>
+                <th>Inicio</th>
+                <th>Fin</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbProgramaciones"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Resumen compacto -->
-      <div class="pills" id="hdrRow">
+      <div class="pills mt2" id="hdrRow">
         <span class="pill">Título: <strong id="hdrTitulo">—</strong></span>
         <span class="pill">Tiempo/descarga: <strong id="hdrTiempo">—</strong> min</span>
         <span class="pill">OT: <strong id="hdrOT">—</strong></span>
@@ -140,7 +161,11 @@
         <div class="table-scroll">
           <table class="table">
             <thead>
-              <tr><th>N</th><th>F. H. INICIO</th><th>F. H. FINAL</th></tr>
+              <tr>
+                <th>N</th>
+                <th>F. H. INICIO</th>
+                <th>F. H. FINAL</th>
+              </tr>
             </thead>
             <tbody id="tbPlan"></tbody>
           </table>
@@ -174,4 +199,5 @@
     })();
   </script>
 </body>
+
 </html>

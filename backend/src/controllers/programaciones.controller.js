@@ -57,19 +57,24 @@ export const getPlanVigente = async (req, res) => {
       otcod = act[0].otcod;
       ultimo_fin = act[0].ultimo_fin;
     } else {
-      // No hay activo: traer el último (si existiera) para mostrar su plan.
-      const { recordset: last } = await pool.request()
+      // No hay activo: buscar el PRÓXIMO futuro (no el último pasado)
+      const now = new Date();
+      const { recordset: next } = await pool.request()
         .input('maquina_id', sql.Int, maquina_id)
         .input('lado_id', sql.Int, lado_id)
+        .input('now', sql.DateTime, now)
         .query(`
-          SELECT TOP 1 programacion_id, otcod
-          FROM dbo.RET_DGT_PROGRAMACIONES
-          WHERE maquina_id=@maquina_id AND lado_id=@lado_id
-          ORDER BY programacion_id DESC;
+          SELECT TOP 1 p.programacion_id, p.otcod
+          FROM dbo.RET_DGT_PROGRAMACIONES p
+          JOIN dbo.RET_DGT_PLAN_DESCARGAS pd ON pd.programacion_id = p.programacion_id
+          WHERE p.maquina_id=@maquina_id AND p.lado_id=@lado_id
+            AND pd.fh_inicio_plan > @now
+          ORDER BY pd.fh_inicio_plan ASC;
         `);
-      if (last.length) {
-        programacion_id = last[0].programacion_id;
-        otcod = last[0].otcod;
+
+      if (next.length) {
+        programacion_id = next[0].programacion_id;
+        otcod = next[0].otcod;
       }
     }
 
@@ -128,30 +133,10 @@ export const crearProgramacion = async (req, res) => {
   const pool = await getPool();
 
   try {
-    // 1) ¿ocupado?
-    const { recordset: act } = await pool.request()
-      .input('maquina_id', sql.Int, maquina_id)
-      .input('lado_id', sql.Int, lado_id)
-      .query(`
-        SELECT TOP 1 MAX(pd.fh_fin_plan) AS ultimo_fin, p.otcod
-        FROM dbo.RET_DGT_PROGRAMACIONES p
-        JOIN dbo.RET_DGT_PLAN_DESCARGAS pd ON pd.programacion_id = p.programacion_id
-        WHERE p.maquina_id=@maquina_id AND p.lado_id=@lado_id
-          AND pd.fh_fin_plan > GETDATE()
-        GROUP BY p.otcod
-        ORDER BY ultimo_fin DESC;
-      `);
-    if (act.length) {
-      const uf = new Date(act[0].ultimo_fin);
-      return res.status(409).json({
-        ok: false,
-        error: `Máquina/lado ocupado hasta ${uf.toLocaleString('es-PE')}`,
-        ultimo_fin: uf.toISOString(),
-        otcod: act[0].otcod
-      });
-    }
+    // 1) Validar solapamiento de rangos (Overlap)
+    // Necesitamos saber cuándo termina la NUEVA programación para ver si choca con algo.
 
-    // 2) minutos por descarga (requerido para minutos_plan)
+    // a) Obtener minutos título
     const { recordset: tit } = await pool.request()
       .input('titulo_id', sql.Int, titulo_id)
       .query(`SELECT minutos_por_descarga FROM dbo.RET_DGT_TITULOS WHERE titulo_id=@titulo_id;`);
@@ -165,6 +150,36 @@ export const crearProgramacion = async (req, res) => {
 
     const inicio = new Date(fecha_hora_inicio);
     const n = parseInt(descargas_programadas, 10);
+    const duracionTotal = n * mins;
+    const fin = new Date(inicio.getTime() + duracionTotal * 60000);
+
+    // b) Query de solapamiento
+    // Existe alguna descarga tal que: (InicioExistente < FinNuevo) AND (FinExistente > InicioNuevo)
+    const { recordset: overlap } = await pool.request()
+      .input('maquina_id', sql.Int, maquina_id)
+      .input('lado_id', sql.Int, lado_id)
+      .input('ini', sql.DateTime, inicio)
+      .input('fin', sql.DateTime, fin)
+      .query(`
+        SELECT TOP 1 p.otcod, pd.fh_inicio_plan, pd.fh_fin_plan
+        FROM dbo.RET_DGT_PLAN_DESCARGAS pd
+        JOIN dbo.RET_DGT_PROGRAMACIONES p ON p.programacion_id = pd.programacion_id
+        WHERE p.maquina_id = @maquina_id 
+          AND p.lado_id = @lado_id
+          AND pd.fh_inicio_plan < @fin
+          AND pd.fh_fin_plan > @ini
+      `);
+
+    if (overlap.length) {
+      const o = overlap[0];
+      return res.status(409).json({
+        ok: false,
+        error: `Solapamiento con OT ${o.otcod} (${new Date(o.fh_inicio_plan).toLocaleString()} - ${new Date(o.fh_fin_plan).toLocaleString()})`,
+        otcod: o.otcod
+      });
+    }
+
+    // 2) (El paso de obtener minutos ya se hizo arriba, lo reutilizamos)
 
     // 3) Inserción con transacción. NO escribir fh_fin_plan si es computada.
     const tx = new sql.Transaction(pool);
@@ -286,7 +301,72 @@ export const editarPlanFila = async (req, res) => {
 
   } catch (e) {
     console.error('editarPlanFila ERROR:', e);
-    try { await tx.rollback(); } catch {}
-    return res.status(500).json({ ok: false, error: e.message });
+    try { await tx.rollback(); } catch { }
+  }
+};
+
+/* -------------------- DELETE /api/programaciones/:id ---------------------- */
+export const deleteProgramacion = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' });
+
+  const pool = await getPool();
+  const tx = new sql.Transaction(pool);
+  try {
+    await tx.begin();
+
+    // 1) Borrar detalle
+    await new sql.Request(tx)
+      .input('id', sql.Int, id)
+      .query('DELETE FROM dbo.RET_DGT_PLAN_DESCARGAS WHERE programacion_id=@id');
+
+    // 2) Borrar cabecera
+    await new sql.Request(tx)
+      .input('id', sql.Int, id)
+      .query('DELETE FROM dbo.RET_DGT_PROGRAMACIONES WHERE programacion_id=@id');
+
+    await tx.commit();
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    try { await tx.rollback(); } catch { }
+    res.status(500).json({ error: e.message });
+  }
+};
+
+/* ---------------- GET /api/programaciones/activas ---------------- */
+export const getProgramacionesActivas = async (req, res) => {
+  const maquina_id = parseInt(req.query.maquina_id, 10);
+  const lado_id = parseInt(req.query.lado_id, 10);
+  if (!maquina_id || !lado_id) return res.status(400).json({ error: 'Faltan params' });
+
+  try {
+    const pool = await getPool();
+    // Traer programaciones que tengan al menos una descarga futura (o que sean recientes)
+    // Para simplificar: traemos las que tienen fin > NOW
+    const now = new Date();
+    const { recordset } = await pool.request()
+      .input('maquina_id', sql.Int, maquina_id)
+      .input('lado_id', sql.Int, lado_id)
+      .input('now', sql.DateTime, now)
+      .query(`
+        SELECT 
+          p.programacion_id,
+          p.otcod,
+          t.nombre AS titulo,
+          MIN(pd.fh_inicio_plan) AS inicio,
+          MAX(pd.fh_fin_plan) AS fin
+        FROM dbo.RET_DGT_PROGRAMACIONES p
+        JOIN dbo.RET_DGT_PLAN_DESCARGAS pd ON pd.programacion_id = p.programacion_id
+        JOIN dbo.RET_DGT_TITULOS t ON t.titulo_id = p.titulo_id
+        WHERE p.maquina_id = @maquina_id AND p.lado_id = @lado_id
+        GROUP BY p.programacion_id, p.otcod, t.nombre
+        HAVING MAX(pd.fh_fin_plan) > @now
+        ORDER BY MIN(pd.fh_inicio_plan) ASC
+      `);
+
+    res.json(recordset);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 };

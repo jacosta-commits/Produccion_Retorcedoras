@@ -1,220 +1,147 @@
 // frontend/public/js/supervisor/resumen.js
-const $  = (s, d=document) => d.querySelector(s);
+import { api, fmtFull } from './_lib.js';
 
-const api = {
-  async get(url) {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`HTTP ${r.status} GET ${url}`);
-    return r.json();
-  },
-  async put(url, body) {
-    const r = await fetch(url, {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) {
-      let msg = `HTTP ${r.status} PUT ${url}`;
-      try { const j = await r.json(); if (j?.error) msg += ` — ${j.error}`; } catch {}
-      throw new Error(msg);
-    }
-    return r.json();
-  }
-};
+const $ = s => document.querySelector(s);
 
-/* ---------- util fecha ---------- */
-const pad = n => String(n).padStart(2,'0');
-function toLocalInputValue(dt) {
-  const d = (dt instanceof Date) ? dt : new Date(dt);
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-function fmtFull(dt) {
-  const d = (dt instanceof Date) ? dt : new Date(dt);
-  return d.toLocaleString('es-PE', {
-    day:'2-digit', month:'2-digit', year:'numeric',
-    hour:'2-digit', minute:'2-digit'
-  });
-}
-const getStart = row => row.fh_inicio_plan ?? row.fh_inicio ?? row.fh_ini ?? null;
-const getEnd   = row => row.fh_fin_plan    ?? row.fh_fin    ?? row.fh_final ?? null;
-
-/* ---------- maestros ---------- */
-async function cargarMaquinas(){
-  const data = await api.get('/api/maestros/maquinas');
-  const sel = $('#selMaquina'); sel.innerHTML = '';
-  for (const m of data) {
-    const opt = document.createElement('option');
-    opt.value = m.maquina_id;
-    opt.textContent = m.nombre || m.codigo;
-    sel.appendChild(opt);
-  }
-}
-async function cargarLados(){
-  const data = await api.get('/api/maestros/lados');
-  const sel = $('#selLado'); sel.innerHTML = '';
-  for (const l of data) {
-    const opt = document.createElement('option');
-    opt.value = l.lado_id;
-    opt.textContent = l.nombre;
-    sel.appendChild(opt);
-  }
-}
-
-/* ---------- cabecera + tabla ---------- */
-function renderCabecera(r){
-  $('#hdrTitulo').textContent = r?.titulo?.nombre ?? '—';
-  $('#hdrTiempo').textContent = r?.titulo?.minutos_por_descarga ?? '—';
-  $('#hdrOT').textContent     = r?.ot?.otcod ?? '—';
-}
-
-function renderTabla(plan){
-  const tb = $('#tbPlan'); 
+/* ------------------ Renderizado de Lista de Programaciones ------------------ */
+function renderProgramaciones(list) {
+  const sec = $('#secProgramaciones');
+  const tb = $('#tbProgramaciones');
   tb.innerHTML = '';
 
-  const toDate = v => { if (!v) return null; const d = new Date(v); return isNaN(d) ? null : d; };
-  const nowMs = Date.now();
-
-  // solo filas futuras por F.H. FINAL
-  const rows = (plan || []).filter(row => {
-    const fin = toDate(getEnd(row));
-    return fin && fin.getTime() >= nowMs;
-  });
-
-  if (!rows.length){
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="3" class="muted">Sin descargas futuras.</td>`;
-    tb.appendChild(tr);
+  if (!list || !list.length) {
+    sec.style.display = 'none';
     return;
   }
 
-  rows.forEach(row => {
+  sec.style.display = 'block';
+  list.forEach(p => {
     const tr = document.createElement('tr');
-    tr.dataset.planId = row.plan_descarga_id;
+    tr.innerHTML = `
+      <td>${p.otcod}</td>
+      <td>${p.titulo}</td>
+      <td>${fmtFull(p.inicio)}</td>
+      <td>${fmtFull(p.fin)}</td>
+      <td>
+        <button class="btn-danger btn-sm" data-id="${p.programacion_id}">Eliminar</button>
+      </td>
+    `;
 
-    const tdN = document.createElement('td');
-    tdN.textContent = row.secuencia ?? '';
-    tr.appendChild(tdN);
-
-    const tdIni = document.createElement('td');
-    tdIni.className = 'editable';
-    tdIni.tabIndex = 0;
-    tdIni.textContent = fmtFull(getStart(row));
-    enableCellEdit(tdIni, row);
-    tr.appendChild(tdIni);
-
-    const tdFin = document.createElement('td');
-    tdFin.textContent = fmtFull(getEnd(row));
-    tr.appendChild(tdFin);
+    // Bind delete
+    const btn = tr.querySelector('button');
+    btn.addEventListener('click', () => eliminarProgramacion(p.programacion_id));
 
     tb.appendChild(tr);
   });
 }
 
-/* ---------- edición en celda ---------- */
-function enableCellEdit(td, row){
-  td.addEventListener('dblclick', () => startEdit(td, row));
-  td.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); startEdit(td, row); }});
-  let lastTap = 0;
-  td.addEventListener('touchend', () => {
-    const now = Date.now();
-    if (now - lastTap < 300) startEdit(td, row);
-    lastTap = now;
-  }, {passive:true});
+async function eliminarProgramacion(id) {
+  if (!confirm('¿Estás seguro de eliminar esta programación y todo su plan?')) return;
+  try {
+    await api.delete(`/api/programaciones/${id}`);
+    await cargar(); // Recargar todo
+  } catch (e) {
+    alert('Error al eliminar: ' + e.message);
+  }
 }
 
-function startEdit(td, row){
-  if (td.dataset.editing === '1') return;
-  td.dataset.editing = '1';
+/* ------------------ Renderizado de Plan Detallado (Vigente) ------------------ */
+function renderPlan(plan) {
+  const tb = $('#tbPlan');
+  tb.innerHTML = '';
 
-  const prevValue = getStart(row);
-  const prevLabel = td.textContent;
+  // Header Info
+  $('#hdrTitulo').textContent = plan?.titulo ?? '—';
+  $('#hdrTiempo').textContent = plan?.minutos_por_descarga ?? '—';
+  $('#hdrOT').textContent = plan?.otcod ?? '—';
 
-  const wrap = document.createElement('div');
-  wrap.style.display = 'flex';
-  wrap.style.gap = '6px';
-  wrap.style.alignItems = 'center';
-
-  const input = document.createElement('input');
-  input.type = 'datetime-local';
-  input.value = toLocalInputValue(prevValue);
-  Object.assign(input.style, {
-    height: '34px', borderRadius: '8px', border: '1px solid var(--line)',
-    background: 'var(--card)', color: 'var(--text)', padding: '0 10px'
-  });
-
-  const btnOk = document.createElement('button');
-  btnOk.textContent = 'Guardar';
-  btnOk.className = 'btn'; btnOk.style.height = '34px';
-
-  const btnCancel = document.createElement('button');
-  btnCancel.textContent = 'Cancelar';
-  btnCancel.className = 'btn ghost'; btnCancel.style.height = '34px';
-
-  td.innerHTML = '';
-  wrap.append(input, btnOk, btnCancel);
-  td.appendChild(wrap);
-  input.focus();
-
-  const cancel = () => { td.textContent = prevLabel; td.dataset.editing = '0'; };
-
-  const commit = async () => {
-    const v = input.value;
-    if (!v) return cancel();
-    const newDt = new Date(v);
-    try {
-      await api.put(`/api/programaciones/plan/${row.plan_descarga_id}`, {
-        fh_inicio_plan: newDt.toISOString()
-      });
-      await cargar();
-    } catch (e) {
-      console.error(e);
-      alert('No se pudo guardar el cambio.');
-      cancel();
-    }
-  };
-
-  btnOk.addEventListener('click', commit);
-  btnCancel.addEventListener('click', cancel);
-  input.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') commit();
-    if (ev.key === 'Escape') cancel();
-  });
-  input.addEventListener('blur', () => {
-    setTimeout(() => { if (!td.contains(document.activeElement)) cancel(); }, 120);
-  });
-}
-
-/* ---------- carga principal ---------- */
-async function cargar(){
-  const maq  = $('#selMaquina')?.value;
-  const lado = $('#selLado')?.value;
-  if(!maq || !lado) return;
-
-  const r = await api.get(`/api/operario/resumen?maquina_id=${maq}&lado_id=${lado}`);
-  if (!r?.ok) { renderCabecera({}); renderTabla([]); return; }
-  renderCabecera(r);
-  renderTabla(r.plan);
-}
-
-/* ---------- init ---------- */
-document.addEventListener('DOMContentLoaded', async () => {
-  await cargarMaquinas();
-  await cargarLados();
-  if ($('#selMaquina').options.length) $('#selMaquina').selectedIndex = 0;
-  if ($('#selLado').options.length)    $('#selLado').selectedIndex = 0;
-
-  $('#btnRefresh')?.addEventListener('click', cargar);
-  $('#selMaquina')?.addEventListener('change', cargar);
-  $('#selLado')?.addEventListener('change', cargar);
-
-  // hamburguesa simple (por si no tienes el common/nav.js aquí)
-  const btnMenu = document.getElementById('btnMenu'), drawer = document.getElementById('drawer');
-  if (btnMenu && drawer) {
-    const toggle = (e)=>{ e.stopPropagation(); drawer.classList.toggle('open'); };
-    btnMenu.addEventListener('click', toggle);
-    document.addEventListener('click', (ev)=>{ if(!drawer.contains(ev.target) && ev.target!==btnMenu) drawer.classList.remove('open'); });
+  const rows = plan?.plan || [];
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="3" class="muted">Sin plan vigente seleccionado.</td></tr>';
+    return;
   }
 
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.secuencia}</td>
+      <td>${fmtFull(r.fh_inicio)}</td>
+      <td>${fmtFull(r.fh_fin)}</td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+/* ------------------ Carga de Datos ------------------ */
+async function cargar() {
+  const maquina_id = $('#selMaquina').value;
+  const lado_id = $('#selLado').value;
+  if (!maquina_id || !lado_id) return;
+
+  try {
+    // 1. Cargar lista de programaciones activas
+    const activas = await api.get(`/api/programaciones/activas?maquina_id=${maquina_id}&lado_id=${lado_id}`)
+      .catch(() => []); // Si falla, asumimos vacío para no romper todo
+
+    renderProgramaciones(activas);
+
+    // 2. Cargar detalle del plan vigente (el que se está ejecutando o el último)
+    // Reutilizamos el endpoint existente que ya trae el plan detallado
+    const vigente = await api.get(`/api/programaciones/vigente?maquina_id=${maquina_id}&lado_id=${lado_id}`);
+
+    if (vigente.ok && vigente.programacion_id) {
+      // Necesitamos info extra que 'vigente' no trae completa en el root (titulo, mins), 
+      // pero podemos inferirla o modificar el endpoint.
+      // Por ahora, usaremos lo que hay. Si falta info en el header, se verá '—'.
+      // Nota: El endpoint 'vigente' actual devuelve { ok, programacion_id, otcod, plan: [...] }
+      // Para mostrar Título y Minutos en el header, idealmente el endpoint debería devolverlos.
+      // Si no, los sacamos de la lista de activas si coincide el ID.
+
+      const match = activas.find(a => a.programacion_id === vigente.programacion_id);
+      const info = {
+        otcod: vigente.otcod,
+        plan: vigente.plan,
+        titulo: match?.titulo, // Enriquecer con lo que trajimos de 'activas'
+        minutos_por_descarga: match ? Math.round((new Date(match.fin) - new Date(match.inicio)) / 60000 / vigente.plan.length) : '?'
+        // Calculo aproximado o '?' si no coincide. 
+        // Mejor sería que el backend /vigente devuelva todo, pero para no tocar tanto backend ahora:
+      };
+      renderPlan(info);
+    } else {
+      renderPlan(null);
+    }
+
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+/* ------------------ Init ------------------ */
+async function loadMaestros() {
+  const maquinas = await api.get('/api/maestros/maquinas');
+  const lados = await api.get('/api/maestros/lados');
+
+  const sm = $('#selMaquina'); sm.innerHTML = '';
+  maquinas.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.maquina_id; o.textContent = m.nombre;
+    sm.appendChild(o);
+  });
+
+  const sl = $('#selLado'); sl.innerHTML = '';
+  lados.forEach(l => {
+    const o = document.createElement('option');
+    o.value = l.lado_id; o.textContent = l.nombre;
+    sl.appendChild(o);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadMaestros();
+
+  $('#selMaquina').addEventListener('change', cargar);
+  $('#selLado').addEventListener('change', cargar);
+  $('#btnRefresh').addEventListener('click', cargar);
+
   await cargar();
-  setInterval(cargar, 30000);
 });
