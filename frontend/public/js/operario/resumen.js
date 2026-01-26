@@ -130,5 +130,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btnRefresh').addEventListener('click', cargar);
 
   await cargar();
-  setInterval(cargar, 30000);
+  setInterval(cargar, 2000);
 });
