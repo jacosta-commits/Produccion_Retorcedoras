@@ -378,3 +378,42 @@ body {
   /* Ocultar user en header móvil si quieres simplificar */
   /* O mostrarlo abajo del drawer */
 }
+
+/* --------- Input Fecha Tabla (Moderno) --------- */
+.input-fecha-tabla {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  max-width: 220px;
+  transition: all 0.2s ease;
+}
+
+.input-fecha-tabla:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.input-fecha-tabla:focus {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: var(--accent-from);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Icono del calendario (invertido para dark mode) */
+.input-fecha-tabla::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.input-fecha-tabla::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}

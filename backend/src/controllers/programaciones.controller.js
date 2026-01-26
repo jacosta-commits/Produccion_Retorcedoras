@@ -164,17 +164,36 @@ export const crearProgramacion = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Minutos inválidos para el título' });
     }
 
-    const parts = fecha_hora_inicio.split('T');
-    const ymd = parts[0].split('-');
-    const hm = parts[1].split(':');
+    // Parsear fecha "Face Value" (d/m/Y H:i) a UTC Timestamp
+    // El frontend envía "26/01/2026 14:30"
+    let inicio;
+    if (fecha_hora_inicio.includes('/')) {
+      const parts = fecha_hora_inicio.split(' '); // ["26/01/2026", "14:30"]
+      const dmy = parts[0].split('/'); // ["26", "01", "2026"]
+      const hm = parts[1].split(':'); // ["14", "30"]
 
-    const inicio = new Date(Date.UTC(
-      parseInt(ymd[0], 10),
-      parseInt(ymd[1], 10) - 1,
-      parseInt(ymd[2], 10),
-      parseInt(hm[0], 10),
-      parseInt(hm[1], 10)
-    ));
+      inicio = new Date(Date.UTC(
+        parseInt(dmy[2], 10),
+        parseInt(dmy[1], 10) - 1,
+        parseInt(dmy[0], 10),
+        parseInt(hm[0], 10),
+        parseInt(hm[1], 10)
+      ));
+    } else if (fecha_hora_inicio.includes('T')) {
+      // Fallback por si acaso (ISO)
+      const parts = fecha_hora_inicio.split('T');
+      const ymd = parts[0].split('-');
+      const hm = parts[1].split(':');
+      inicio = new Date(Date.UTC(
+        parseInt(ymd[0], 10),
+        parseInt(ymd[1], 10) - 1,
+        parseInt(ymd[2], 10),
+        parseInt(hm[0], 10),
+        parseInt(hm[1], 10)
+      ));
+    } else {
+      throw new Error('Formato de fecha inválido. Use d/m/Y H:i');
+    }
 
     const n = parseInt(descargas_programadas, 10);
     const duracionTotal = n * mins;
@@ -282,7 +301,37 @@ export const editarPlanFila = async (req, res) => {
 
     const { programacion_id, secuencia, minutos_por_descarga } = info[0];
     const mins = parseInt(minutos_por_descarga, 10);
-    let curIni = new Date(fh_inicio_plan);
+
+    // Parsear fecha "Face Value" (YYYY-MM-DDTHH:mm) a UTC Timestamp
+    // Esperamos formato ISO sin Z: "2026-01-26T10:00"
+    // Parsear fecha "Face Value" (d/m/Y H:i) a UTC Timestamp
+    // El frontend envía "26/01/2026 14:30"
+    let curIni;
+    if (fh_inicio_plan.includes('/')) {
+      const parts = fh_inicio_plan.split(' ');
+      const dmy = parts[0].split('/');
+      const hm = parts[1].split(':');
+      curIni = new Date(Date.UTC(
+        parseInt(dmy[2], 10),
+        parseInt(dmy[1], 10) - 1,
+        parseInt(dmy[0], 10),
+        parseInt(hm[0], 10),
+        parseInt(hm[1], 10)
+      ));
+    } else if (fh_inicio_plan.includes('T')) {
+      const parts = fh_inicio_plan.split('T');
+      const ymd = parts[0].split('-');
+      const hm = parts[1].split(':');
+      curIni = new Date(Date.UTC(
+        parseInt(ymd[0], 10),
+        parseInt(ymd[1], 10) - 1,
+        parseInt(ymd[2], 10),
+        parseInt(hm[0], 10),
+        parseInt(hm[1], 10)
+      ));
+    } else {
+      curIni = new Date(fh_inicio_plan);
+    }
 
     await new sql.Request(tx)
       .input('id', sql.Int, id)
@@ -382,6 +431,60 @@ export const getProgramacionesActivas = async (req, res) => {
 
     res.json(recordset);
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+/* ---------------- GET /api/programaciones/:id ---------------- */
+export const getProgramacionById = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' });
+
+  try {
+    const pool = await getPool();
+
+    // 1. Obtener cabecera
+    const { recordset: head } = await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT 
+          p.programacion_id,
+          p.otcod,
+          t.nombre AS titulo,
+          t.minutos_por_descarga
+        FROM dbo.RET_DGT_PROGRAMACIONES p
+        JOIN dbo.RET_DGT_TITULOS t ON t.titulo_id = p.titulo_id
+        WHERE p.programacion_id = @id
+      `);
+
+    if (!head.length) return res.status(404).json({ error: 'Programación no encontrada' });
+    const prog = head[0];
+
+    // 2. Obtener plan
+    const { recordset: plan } = await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT
+          plan_descarga_id,
+          secuencia,
+          fh_inicio_plan AS fh_inicio,
+          fh_fin_plan    AS fh_fin
+        FROM dbo.RET_DGT_PLAN_DESCARGAS
+        WHERE programacion_id = @id
+        ORDER BY secuencia
+      `);
+
+    res.json({
+      ok: true,
+      programacion_id: prog.programacion_id,
+      otcod: prog.otcod,
+      titulo: prog.titulo,
+      minutos_por_descarga: prog.minutos_por_descarga,
+      plan
+    });
+
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ error: e.message });
   }
 };

@@ -33,7 +33,7 @@ export const fmtHora = v => {
   return d.toLocaleTimeString('es-PE', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hour12: true,
     timeZone: 'UTC'
   });
 };
@@ -46,7 +46,7 @@ export const fmtFull = (dt) => {
   return d.toLocaleString('es-PE', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
-    hour12: false,
+    hour12: true,
     timeZone: 'UTC'
   });
 };

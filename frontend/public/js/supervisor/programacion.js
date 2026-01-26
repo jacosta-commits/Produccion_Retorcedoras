@@ -40,7 +40,7 @@ const fmtFull = (dt) => {
   return d.toLocaleString('es-PE', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
-    hour12: false,
+    hour12: true,
     timeZone: 'UTC'
   });
 };
@@ -110,7 +110,7 @@ async function checkLibre() {
 
       // min del input: ahora
       const now = new Date();
-      inpInicio.min = toLocalInputValue(now);
+      // inpInicio.min = toLocalInputValue(now); // Flatpickr maneja minDate si se quiere
       return { libre: true };
     }
 
@@ -132,14 +132,12 @@ async function checkLibre() {
     }
 
     // Coloca un mínimo en el input para evitar iniciar antes de AHORA (permitir huecos)
+    // Con Flatpickr se usa set('minDate', ...)
+    /*
     const minInicio = new Date();
-    inpInicio.min = toLocalInputValue(minInicio);
-
-    // si el valor actual es menor al mínimo (pasado), lo reajustamos
-    const v = inpInicio.value ? new Date(inpInicio.value) : null;
-    if (!v || (v < minInicio)) {
-      inpInicio.value = toLocalInputValue(minInicio);
-    }
+    const fp = document.querySelector('#inicio')._flatpickr;
+    if (fp) fp.set('minDate', minInicio);
+    */
 
     return { libre: !r.ocupado, last: ULTIMO_FIN, ot: r.otcod };
   } catch (e) {
@@ -182,24 +180,30 @@ async function crearProgramacion(ev) {
   const btn = $('#btnCrear');
   btn.disabled = true;
 
-  const inicio = new Date($('#inicio').value);
+  // Flatpickr instance:
+  const fp = document.querySelector('#inicio')._flatpickr;
+  let fechaEnvio = $('#inicio').value; // Fallback
+
+  if (fp && fp.selectedDates.length > 0) {
+    // Extraer fecha del objeto Date y formatear como "YYYY-MM-DDTHH:mm" (Face Value)
+    // para que el backend lo parsee correctamente sin importar el formato visual (AM/PM)
+    const d = fp.selectedDates[0];
+    const pad = n => String(n).padStart(2, '0');
+    fechaEnvio = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   const body = {
     maquina_id: parseInt($('#maquina_id').value, 10),
     lado_id: parseInt($('#lado_id').value, 10),
     otcod: $('#otcod').value.trim(),
     titulo_id: parseInt($('#titulo_id').value, 10),
-    // Enviar la hora local tal cual (YYYY-MM-DDTHH:mm) para evitar conversión a UTC (+5h)
-    fecha_hora_inicio: $('#inicio').value,
+    fecha_hora_inicio: fechaEnvio,
     descargas_programadas: parseInt($('#desc').value, 10)
   };
 
   try {
-    // 1) Defensa en cliente: ELIMINADA para permitir huecos.
-    // La validación real de solapamiento la hace el backend.
-
-    // 2) Re-chequeo de “libre” (opcional, pero ya no bloqueante por fecha final)
-    // const st = await checkLibre(); 
-    // (Ya no bloqueamos aquí)
+    // Validar fecha
+    if (!body.fecha_hora_inicio) throw new Error('Seleccione fecha y hora de inicio');
 
     // 3) Crear
     await api.post('/api/programaciones', body);
@@ -228,9 +232,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // fecha por defecto
   const now = new Date(); now.setSeconds(0, 0);
-  $('#inicio').value = toLocalInputValue(now);
+  // $('#inicio').value = toLocalInputValue(now); // Flatpickr lo maneja con defaultDate
 
   // eventos
+  // Init Flatpickr
+  flatpickr('#inicio', {
+    enableTime: true,
+    dateFormat: "d/m/Y h:i K", // Formato visual AM/PM
+    time_24hr: false,
+    locale: "es",
+    defaultDate: now, // Por defecto ahora (sin segundos)
+  });
+
   $('#frmProg').addEventListener('submit', crearProgramacion);
   $('#maquina_id').addEventListener('change', checkLibre);
   $('#lado_id').addEventListener('change', checkLibre);

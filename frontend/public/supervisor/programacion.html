@@ -1,14 +1,21 @@
 <!doctype html>
 <html lang="es">
+
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="utf-8" />
   <base href="/retorcidos/">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Supervisor | Programación</title>
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="/css/common.css"/>
-  <link rel="stylesheet" href="/css/supervisor.css"/>
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/supervisor.css" />
+
+  <!-- Flatpickr (Dark Theme) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
 
   <!-- Ajustes del header: nombre a la derecha + botón logout -->
   <style>
@@ -88,13 +95,14 @@
     }
   </style>
 </head>
+
 <body data-theme="dark">
 
   <!-- Header + Drawer -->
   <header class="sup-header">
     <div class="sup-header-left">
-      <button id="menuBtn" type="button" class="hamburger"
-              aria-controls="supMenu" aria-expanded="false" aria-label="Abrir menú">
+      <button id="menuBtn" type="button" class="hamburger" aria-controls="supMenu" aria-expanded="false"
+        aria-label="Abrir menú">
         <span></span><span></span><span></span>
       </button>
       <div class="brand">Supervisor</div>
@@ -139,7 +147,7 @@
 
         <div class="field">
           <label>Fecha Hora inicio</label>
-          <input id="inicio" type="datetime-local" required>
+          <input id="inicio" type="text" class="flatpickr-input" required>
         </div>
 
         <div class="field">
@@ -165,7 +173,11 @@
         <div class="table-scroll">
           <table class="table">
             <thead>
-              <tr><th>N</th><th>F. H. INICIO</th><th>F. H. FINAL</th></tr>
+              <tr>
+                <th>N</th>
+                <th>F. H. INICIO</th>
+                <th>F. H. FINAL</th>
+              </tr>
             </thead>
             <tbody id="tbPlan"></tbody>
           </table>
@@ -188,4 +200,5 @@
     })();
   </script>
 </body>
+
 </html>
