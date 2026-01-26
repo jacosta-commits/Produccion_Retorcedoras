@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8" />
   <base href="/retorcidos/">
@@ -86,12 +87,13 @@
     }
   </style>
 </head>
+
 <body data-theme="dark">
 
   <header class="sup-header">
     <div class="sup-header-left">
-      <button id="menuBtn" type="button" class="hamburger"
-              aria-controls="supMenu" aria-expanded="false" aria-label="Abrir menú">
+      <button id="menuBtn" type="button" class="hamburger" aria-controls="supMenu" aria-expanded="false"
+        aria-label="Abrir menú">
         <span></span><span></span><span></span>
       </button>
       <div class="brand">Supervisor</div>
@@ -111,12 +113,36 @@
 
   <main class="page">
     <section class="card">
-      <form id="frmTitulo" class="toolbar" novalidate>
-        <input id="nombre" class="input grow" placeholder="Nombre del título (ej. 108 NY)" required />
-        <input id="min" class="input" type="number" min="1" step="1" placeholder="Min por descarga" required />
-        <button class="btn primary" type="submit">Agregar</button>
-        <span id="msg" class="muted"></span>
+      <div style="margin-bottom: 16px;">
+        <h2 style="font-size: 1.25rem; font-weight: 600; color: #fff; margin: 0;">Gestionar Títulos</h2>
+        <p style="color: var(--muted); font-size: 0.9rem; margin-top: 4px;">Crea nuevos títulos para asignar a las
+          máquinas.</p>
+      </div>
+
+      <form id="frmTitulo" class="form-row" novalidate>
+        <div class="field" style="flex: 1; min-width: 250px;">
+          <label for="nombre">Nombre del Título</label>
+          <input id="nombre" placeholder="Ej. 108 NY" required />
+        </div>
+
+        <div class="field" style="width: 140px;">
+          <label for="min">Min / Descarga</label>
+          <input id="min" type="number" min="1" step="1" placeholder="90" required />
+        </div>
+
+        <div class="field">
+          <label style="visibility: hidden;">Action</label>
+          <button class="btn" type="submit">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Agregar
+          </button>
+        </div>
       </form>
+      <div id="msg" class="muted" style="margin-top: 12px; font-size: 0.9rem;"></div>
     </section>
 
     <section class="card mt2">
@@ -125,7 +151,10 @@
         <div class="table-scroll">
           <table class="table">
             <thead>
-              <tr><th>Título</th><th>Min/descarga</th></tr>
+              <tr>
+                <th>Título</th>
+                <th>Min/descarga</th>
+              </tr>
             </thead>
             <tbody id="tbTitulos"></tbody>
           </table>
@@ -147,4 +176,5 @@
     })();
   </script>
 </body>
+
 </html>

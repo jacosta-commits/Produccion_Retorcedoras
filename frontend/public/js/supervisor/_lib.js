@@ -29,16 +29,25 @@ export const fmtHora = v => {
   if (!v) return '—';
   const d = new Date(v);
   if (isNaN(d)) return String(v);
-  return d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+  // FIX TIMEZONE: Mostrar valor facial UTC como si fuera local
+  return d.toLocaleTimeString('es-PE', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'UTC'
+  });
 };
 
 export const fmtFull = (dt) => {
   if (!dt) return '—';
   const d = (dt instanceof Date) ? dt : new Date(dt);
   if (isNaN(d)) return '—';
+  // FIX TIMEZONE: Mostrar valor facial UTC como si fuera local
   return d.toLocaleString('es-PE', {
     day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
+    hour: '2-digit', minute: '2-digit',
+    hour12: false,
+    timeZone: 'UTC'
   });
 };
 

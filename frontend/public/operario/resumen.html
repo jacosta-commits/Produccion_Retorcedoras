@@ -1,27 +1,36 @@
 <!doctype html>
 <html lang="es">
+
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="utf-8" />
   <base href="/retorcidos/">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Operario | Resumen</title>
-  <link rel="stylesheet" href="/css/common.css"/>
-  <link rel="stylesheet" href="/css/operario.css"/>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/operario.css" />
 </head>
+
 <body data-theme="dark">
   <div class="container">
     <div class="card">
       <!-- Controles -->
-      <div class="flex gap">
-        <label>
-          <span class="muted" style="display:block;font-size:.9rem">Máquina</span>
-          <select id="selMaquina"></select>
-        </label>
-        <button class="btn" id="btnRefresh" style="align-self:end">Refrescar</button>
+      <div class="flex gap" style="justify-content: space-between;">
+        <div class="flex">
+          <label class="flex" style="gap:8px">
+            <span class="muted" style="font-size:.9rem; font-weight:500">MÁQUINA:</span>
+            <select id="selMaquina"></select>
+          </label>
+        </div>
+        <button class="btn" id="btnRefresh">Refrescar</button>
       </div>
 
       <!-- Resumen compacto -->
-      <div class="mt1 pills" id="hdrRow">
+      <div class="mt2 pills" id="hdrRow">
         <span class="pill">Título: <strong id="hdrTitulo">—</strong></span>
         <span class="pill">Tiempo/descarga: <strong id="hdrTiempo">—</strong> min</span>
         <span class="pill">OT: <strong id="hdrOT">—</strong></span>
@@ -34,7 +43,13 @@
           <div class="table-wrap">
             <div class="table-scroll">
               <table class="table">
-                <thead><tr><th>N</th><th>F. H. INICIO</th><th>F. H. FINAL</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>N</th>
+                    <th>F. H. INICIO</th>
+                    <th>F. H. FINAL</th>
+                  </tr>
+                </thead>
                 <tbody id="tbPlanA"></tbody>
               </table>
             </div>
@@ -46,7 +61,13 @@
           <div class="table-wrap">
             <div class="table-scroll">
               <table class="table">
-                <thead><tr><th>N</th><th>F. H. INICIO</th><th>F. H. FINAL</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>N</th>
+                    <th>F. H. INICIO</th>
+                    <th>F. H. FINAL</th>
+                  </tr>
+                </thead>
                 <tbody id="tbPlanB"></tbody>
               </table>
             </div>
@@ -58,4 +79,5 @@
 
   <script type="module" src="/js/operario/resumen.js"></script>
 </body>
+
 </html>

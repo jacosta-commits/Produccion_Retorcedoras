@@ -31,7 +31,13 @@ const toLocalInputValue = (dt) => {
 };
 const fmtFull = (dt) => {
   const d = (dt instanceof Date) ? dt : new Date(dt);
-  return d.toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  // FIX TIMEZONE: Mostrar valor facial UTC
+  return d.toLocaleString('es-PE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+    hour12: false,
+    timeZone: 'UTC'
+  });
 };
 const getStart = r => r.fh_inicio ?? r.fh_inicio_plan ?? null;
 const getEnd = r => r.fh_fin ?? r.fh_fin_plan ?? null;

@@ -6,6 +6,17 @@ function addMinutes(date, mins) {
   return new Date(date.getTime() + mins * 60000);
 }
 
+// Helper para obtener la hora actual de Perú como "Face Value" en UTC.
+function getNowFaceValue() {
+  const s = new Date().toLocaleString('en-CA', {
+    timeZone: 'America/Lima',
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).replace(', ', 'T');
+  return new Date(s + 'Z');
+}
+
 /* ---------------------- GET /api/programaciones/vigente ------------------- */
 /**
  * Devuelve el plan “vigente” (si hay alguno con fin futuro), o el último plan,
@@ -31,17 +42,19 @@ export const getPlanVigente = async (req, res) => {
     }
 
     const pool = await getPool();
+    const nowFace = getNowFaceValue();
 
     // ¿Hay plan activo (alguna fila del plan con fin en el futuro)?
     const { recordset: act } = await pool.request()
       .input('maquina_id', sql.Int, maquina_id)
       .input('lado_id', sql.Int, lado_id)
+      .input('now', sql.DateTime, nowFace)
       .query(`
         SELECT TOP 1 p.programacion_id, p.otcod, MAX(pd.fh_fin_plan) AS ultimo_fin
         FROM dbo.RET_DGT_PROGRAMACIONES p
         JOIN dbo.RET_DGT_PLAN_DESCARGAS pd ON pd.programacion_id = p.programacion_id
         WHERE p.maquina_id=@maquina_id AND p.lado_id=@lado_id
-          AND pd.fh_fin_plan > GETDATE()
+          AND pd.fh_fin_plan > @now
         GROUP BY p.programacion_id, p.otcod
         ORDER BY ultimo_fin DESC;
       `);
@@ -58,11 +71,10 @@ export const getPlanVigente = async (req, res) => {
       ultimo_fin = act[0].ultimo_fin;
     } else {
       // No hay activo: buscar el PRÓXIMO futuro (no el último pasado)
-      const now = new Date();
       const { recordset: next } = await pool.request()
         .input('maquina_id', sql.Int, maquina_id)
         .input('lado_id', sql.Int, lado_id)
-        .input('now', sql.DateTime, now)
+        .input('now', sql.DateTime, nowFace)
         .query(`
           SELECT TOP 1 p.programacion_id, p.otcod
           FROM dbo.RET_DGT_PROGRAMACIONES p
@@ -148,7 +160,28 @@ export const crearProgramacion = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Minutos inválidos para el título' });
     }
 
-    const inicio = new Date(fecha_hora_inicio);
+    // FIX TIMEZONE: Construir fecha en UTC preservando el valor facial (Face Value)
+    // Entrada: "2026-01-25T20:00" -> Queremos que sea 20:00 UTC para que se guarde 20:00 en BD
+    const d = new Date(fecha_hora_inicio);
+    // Nota: d.getFullYear() etc usan la zona local del servidor. 
+    // Si el servidor es UTC, new Date("...T20:00") es 20:00 UTC.
+    // Si el servidor es UTC-5, new Date("...T20:00") es 20:00 Local -> 01:00 UTC.
+    // Para evitar ambigüedad, parseamos el string manualmente o ajustamos.
+    // Mejor: Usamos los componentes del string directamente si viene en ISO.
+
+    // Asumimos formato ISO YYYY-MM-DDTHH:mm
+    const parts = fecha_hora_inicio.split('T');
+    const ymd = parts[0].split('-');
+    const hm = parts[1].split(':');
+
+    const inicio = new Date(Date.UTC(
+      parseInt(ymd[0], 10),
+      parseInt(ymd[1], 10) - 1,
+      parseInt(ymd[2], 10),
+      parseInt(hm[0], 10),
+      parseInt(hm[1], 10)
+    ));
+
     const n = parseInt(descargas_programadas, 10);
     const duracionTotal = n * mins;
     const fin = new Date(inicio.getTime() + duracionTotal * 60000);
@@ -172,9 +205,13 @@ export const crearProgramacion = async (req, res) => {
 
     if (overlap.length) {
       const o = overlap[0];
+      // Mensaje amigable para el usuario
+      const iniStr = new Date(o.fh_inicio_plan).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+      const finStr = new Date(o.fh_fin_plan).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+
       return res.status(409).json({
         ok: false,
-        error: `Solapamiento con OT ${o.otcod} (${new Date(o.fh_inicio_plan).toLocaleString()} - ${new Date(o.fh_fin_plan).toLocaleString()})`,
+        error: `⚠️ Cruce de horarios: Ya existe la OT ${o.otcod} de ${iniStr} a ${finStr}.`,
         otcod: o.otcod
       });
     }
@@ -344,11 +381,11 @@ export const getProgramacionesActivas = async (req, res) => {
     const pool = await getPool();
     // Traer programaciones que tengan al menos una descarga futura (o que sean recientes)
     // Para simplificar: traemos las que tienen fin > NOW
-    const now = new Date();
+    const nowFace = getNowFaceValue();
     const { recordset } = await pool.request()
       .input('maquina_id', sql.Int, maquina_id)
       .input('lado_id', sql.Int, lado_id)
-      .input('now', sql.DateTime, now)
+      .input('now', sql.DateTime, nowFace)
       .query(`
         SELECT 
           p.programacion_id,

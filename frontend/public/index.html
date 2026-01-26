@@ -1,20 +1,121 @@
 <!doctype html>
 <html lang="es">
+
 <head>
-  <meta charset="utf-8"/>
-  <title>RET DGT</title>
-  <link rel="stylesheet" href="/css/common.css"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ZENTRIK | Acceso</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/common.css" />
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .card {
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: var(--shadow-md);
+      text-align: center;
+      width: 100%;
+      max-width: 480px;
+      animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    h1 {
+      margin: 0 0 12px 0;
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p {
+      color: var(--muted);
+      margin: 0 0 32px 0;
+      font-size: 1.1rem;
+    }
+
+    .menu-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .menu-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 64px;
+      border-radius: 16px;
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--line);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 1.1rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .menu-btn:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: var(--accent-from);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .menu-btn.primary {
+      background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+      color: #fff;
+      border: none;
+    }
+
+    .menu-btn.primary:hover {
+      box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+    }
+  </style>
 </head>
+
 <body>
-  <div class="container">
-    <div class="card">
-      <h2>RET DGT</h2>
-      <p>Selecciona una web:</p>
-      <div class="flex">
-        <a href="/operario/resumen.html"><button>Web Operario</button></a>
-        <a href="/supervisor/resumen.html"><button>Web Supervisor</button></a>
-      </div>
+  <div class="card">
+    <h1>ZENTRIK</h1>
+    <p>Selecciona el portal de acceso</p>
+
+    <div class="menu-grid">
+      <a href="/operario/resumen.html" class="menu-btn primary">
+        Portal Operario
+      </a>
+      <a href="/supervisor/resumen.html" class="menu-btn">
+        Portal Supervisor
+      </a>
     </div>
   </div>
 </body>
+
 </html>
