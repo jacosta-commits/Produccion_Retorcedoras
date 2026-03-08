@@ -1,5 +1,6 @@
 // backend/src/controllers/programaciones.controller.js
 import { getPool, sql } from '../config/db.js';
+import { randomUUID } from 'node:crypto';
 
 /* --------------------------------- Utils --------------------------------- */
 function addMinutes(date, mins) {
@@ -119,6 +120,7 @@ export const crearProgramacion = async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Faltan campos' });
   }
 
+  const vinculo_id = randomUUID();
   const pool = await getPool();
 
   try {
@@ -237,11 +239,12 @@ export const crearProgramacion = async (req, res) => {
       .input('titulo_id', sql.Int, titulo_id)
       .input('inicio', sql.DateTime, inicio)
       .input('desc', sql.Int, n)
+      .input('vinculo', sql.UniqueIdentifier, vinculo_id)
       .query(`
         SET NOCOUNT ON;
         INSERT INTO dbo.RET_DGT_PROGRAMACIONES
-          (maquina_id, lado_id, otcod, titulo_id, fecha_hora_inicio, descargas_programadas)
-        VALUES (@maquina_id, @lado_id, @otcod, @titulo_id, @inicio, @desc);
+          (maquina_id, lado_id, otcod, titulo_id, fecha_hora_inicio, descargas_programadas, vinculo_id)
+        VALUES (@maquina_id, @lado_id, @otcod, @titulo_id, @inicio, @desc, @vinculo);
         SELECT CAST(SCOPE_IDENTITY() AS INT) AS programacion_id;
       `);
 
@@ -262,8 +265,75 @@ export const crearProgramacion = async (req, res) => {
       curIni = addMinutes(curIni, mins);
     }
 
+    // AUTO-PROGRAM LADO B if Lado A is programmed
+    // Assuming Lado A is ID 1 and Lado B is ID 2.
+    if (lado_id === 1) {
+      const lado_B_id = 2; // Fixed ID for Lado B
+      const inicioLadoB = new Date(inicio.getTime() + mins * 60000); // 1 discharge shift
+      const finLadoB = new Date(inicioLadoB.getTime() + duracionTotal * 60000);
+
+      // Validate overlap for Lado B
+      const { recordset: overlapB } = await new sql.Request(tx)
+        .input('maquina_id', sql.Int, maquina_id)
+        .input('lado_id', sql.Int, lado_B_id)
+        .input('ini', sql.DateTime, inicioLadoB)
+        .input('fin', sql.DateTime, finLadoB)
+        .query(`
+          SELECT TOP 1 p.otcod, pd.fh_inicio_plan, pd.fh_fin_plan
+          FROM dbo.RET_DGT_PLAN_DESCARGAS pd
+          JOIN dbo.RET_DGT_PROGRAMACIONES p ON p.programacion_id = pd.programacion_id
+          WHERE p.maquina_id = @maquina_id 
+            AND p.lado_id = @lado_id
+            AND pd.fh_inicio_plan < @fin
+            AND pd.fh_fin_plan > @ini
+        `);
+
+      if (overlapB.length) {
+        const oB = overlapB[0];
+        const iniStr = new Date(oB.fh_inicio_plan).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+        const finStr = new Date(oB.fh_fin_plan).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+
+        throw new Error(`⚠️ Cruce de horarios en Lado B: Ya existe la OT ${oB.otcod} de ${iniStr} a ${finStr}. No se puede auto-programar.`);
+      }
+
+      // Insert Lado B Base Entry
+      const rsProgB = await new sql.Request(tx)
+        .input('maquina_id', sql.Int, maquina_id)
+        .input('lado_id', sql.Int, lado_B_id)
+        .input('otcod', sql.VarChar(25), otExacto)
+        .input('titulo_id', sql.Int, titulo_id)
+        .input('inicio', sql.DateTime, inicioLadoB)
+        .input('desc', sql.Int, n)
+        .input('vinculo', sql.UniqueIdentifier, vinculo_id)
+        .query(`
+          SET NOCOUNT ON;
+          INSERT INTO dbo.RET_DGT_PROGRAMACIONES
+            (maquina_id, lado_id, otcod, titulo_id, fecha_hora_inicio, descargas_programadas, vinculo_id)
+          VALUES (@maquina_id, @lado_id, @otcod, @titulo_id, @inicio, @desc, @vinculo);
+          SELECT CAST(SCOPE_IDENTITY() AS INT) AS programacion_id;
+        `);
+
+      const programacion_id_B = rsProgB.recordset[0].programacion_id;
+
+      // Insert Lado B Discharges
+      let curIniB = new Date(inicioLadoB);
+      for (let i = 1; i <= n; i++) {
+        await new sql.Request(tx)
+          .input('programacion_id', sql.Int, programacion_id_B)
+          .input('secuencia', sql.Int, i)
+          .input('fh_ini', sql.DateTime, curIniB)
+          .input('mins', sql.Int, mins)
+          .query(`
+            INSERT INTO dbo.RET_DGT_PLAN_DESCARGAS
+              (programacion_id, secuencia, fh_inicio_plan, minutos_plan)
+            VALUES (@programacion_id, @secuencia, @fh_ini, @mins);
+          `);
+        curIniB = addMinutes(curIniB, mins);
+      }
+    }
+
     await tx.commit();
-    return res.status(201).json({ ok: true, programacion_id });
+    return res.status(201).json({ ok: true, programacion_id, auto_programmed_b: lado_id === 1 });
 
   } catch (e) {
     console.error('crearProgramacion ERROR:', e);
@@ -383,18 +453,67 @@ export const deleteProgramacion = async (req, res) => {
   try {
     await tx.begin();
 
-    await new sql.Request(tx)
+    // 1. Obtener info de la programación a borrar para buscar posibles vínculos
+    const { recordset: info } = await new sql.Request(tx)
       .input('id', sql.Int, id)
-      .query('DELETE FROM dbo.RET_DGT_PLAN_DESCARGAS WHERE programacion_id=@id');
+      .query(`
+        SELECT p.vinculo_id, p.maquina_id, p.lado_id, p.otcod, p.fecha_hora_inicio, t.minutos_por_descarga
+        FROM dbo.RET_DGT_PROGRAMACIONES p
+        JOIN dbo.RET_DGT_TITULOS t ON t.titulo_id = p.titulo_id
+        WHERE p.programacion_id = @id
+      `);
 
-    await new sql.Request(tx)
-      .input('id', sql.Int, id)
-      .query('DELETE FROM dbo.RET_DGT_PROGRAMACIONES WHERE programacion_id=@id');
+    if (!info.length) {
+      await tx.rollback();
+      return res.status(404).json({ error: 'Programación no encontrada' });
+    }
+
+    const { vinculo_id, maquina_id, lado_id, otcod, fecha_hora_inicio, minutos_por_descarga } = info[0];
+    const idsABorrar = [id];
+
+    // 2. Identificar programaciones vinculadas
+    if (vinculo_id) {
+      const { recordset: vinculados } = await new sql.Request(tx)
+        .input('vinculo', sql.UniqueIdentifier, vinculo_id)
+        .input('id', sql.Int, id)
+        .query('SELECT programacion_id FROM dbo.RET_DGT_PROGRAMACIONES WHERE vinculo_id=@vinculo AND programacion_id != @id');
+      vinculados.forEach(v => idsABorrar.push(v.programacion_id));
+    } else {
+      // Heurística para registros antiguos sin vinculo_id
+      // Si borro A, busco B que empiece exacto 1 descarga después con misma OT y máquina
+      // Si borro B, busco A que empiece exacto 1 descarga antes
+      const offset = (lado_id === 1) ? minutos_por_descarga : -minutos_por_descarga;
+      const targetLado = (lado_id === 1) ? 2 : 1;
+      const targetInicio = addMinutes(new Date(fecha_hora_inicio), offset);
+
+      const { recordset: twin } = await new sql.Request(tx)
+        .input('m', sql.Int, maquina_id)
+        .input('l', sql.Int, targetLado)
+        .input('ot', sql.VarChar(25), otcod)
+        .input('ini', sql.DateTime, targetInicio)
+        .query(`
+          SELECT programacion_id 
+          FROM dbo.RET_DGT_PROGRAMACIONES 
+          WHERE maquina_id=@m AND lado_id=@l AND otcod=@ot AND fecha_hora_inicio=@ini
+        `);
+      if (twin.length) idsABorrar.push(twin[0].programacion_id);
+    }
+
+    // 3. Ejecutar borrado para todos los IDs identificados
+    for (const progId of idsABorrar) {
+      await new sql.Request(tx)
+        .input('pid', sql.Int, progId)
+        .query('DELETE FROM dbo.RET_DGT_PLAN_DESCARGAS WHERE programacion_id=@pid');
+
+      await new sql.Request(tx)
+        .input('pid', sql.Int, progId)
+        .query('DELETE FROM dbo.RET_DGT_PROGRAMACIONES WHERE programacion_id=@pid');
+    }
 
     await tx.commit();
-    res.json({ ok: true });
+    res.json({ ok: true, deleted_count: idsABorrar.length });
   } catch (e) {
-    console.error(e);
+    console.error('deleteProgramacion ERROR:', e);
     try { await tx.rollback(); } catch { }
     res.status(500).json({ error: e.message });
   }
