@@ -206,12 +206,20 @@ async function crearProgramacion(ev) {
     if (!body.fecha_hora_inicio) throw new Error('Seleccione fecha y hora de inicio');
 
     // 3) Crear
-    await api.post('/api/programaciones', body);
+    const resData = await api.post('/api/programaciones', body);
 
     // 4) Mostrar el plan vigente tras crear
     const v = await api.get(`/api/programaciones/vigente?maquina_id=${body.maquina_id}&lado_id=${body.lado_id}`);
     renderPlan(v?.plan || []);
-    $('#msg').textContent = 'OK';
+
+    // Custom Success Message
+    if (resData.auto_programmed_b) {
+      $('#msg').textContent = 'OK. Lado A y Lado B programados automáticamente.';
+      $('#msg').style.color = '#4caf50';
+    } else {
+      $('#msg').textContent = 'OK. Programación creada.';
+      $('#msg').style.color = 'inherit';
+    }
   } catch (e) {
     console.error('crearProgramacion ERR:', e);
     // Error típico cuando el trigger hace ROLLBACK por solape u otra regla
@@ -227,7 +235,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // defaults
   if ($('#maquina_id').options.length) $('#maquina_id').selectedIndex = 0;
-  if ($('#lado_id').options.length) $('#lado_id').selectedIndex = 0;
+  if ($('#lado_id').options.length) {
+    // Forzamos que siempre sea Lado A (id 1) al cargar
+    $('#lado_id').value = "1";
+  }
   if ($('#titulo_id').options.length) $('#titulo_id').selectedIndex = 0;
 
   // fecha por defecto

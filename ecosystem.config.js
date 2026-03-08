@@ -3,7 +3,7 @@ module.exports = {
   apps: [{
     name: 'retorcedoras',
     script: 'backend/src/server.js',
-    cwd: 'C:/Users/Administrador/Desktop/ZENTRIK_operario/Retorcedoras_Prod',
+    cwd: 'C:/Users/Administrador/Downloads/Desarrollos_FISA/Retorcidos/Produccion_Retorcedoras',
     env: {
       NODE_ENV: 'production',
       BASE_PATH: '/'              // o '/retorcidos/' si así lo necesitas
