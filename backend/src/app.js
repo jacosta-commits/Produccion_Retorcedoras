@@ -11,7 +11,7 @@ import session from 'express-session';
 function normalizeBase(p = '/') {
   let out = String(p || '/').trim();
   if (!out.startsWith('/')) out = '/' + out;
-  if (!out.endsWith('/'))  out = out + '/';
+  if (!out.endsWith('/')) out = out + '/';
   return out;
 }
 const BASE_PATH = normalizeBase(process.env.BASE_PATH || '/');
@@ -42,7 +42,7 @@ app.use(
 
 /* ------------------------- Paths básicos ------------------------- */
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 const publicPath = path.resolve(__dirname, '../../frontend/public');
 
 /* ------------------------- Middleware de protección ------------------------- */
@@ -81,19 +81,23 @@ app.post(`${BASE_PATH}supervisor/login`, async (req, res) => {
     const { getPool } = await import('./config/db.js');
     const pool = await getPool();
 
+    // Limpieza del código
+    const codigoClean = String(codigo).trim();
+
     const result = await pool
       .request()
-      .input('codigo', codigo)
+      .input('codigo', codigoClean)
       .query(`
         SELECT TOP 1 
           tracod,
           traraz AS NombreSupervisor
         FROM [Medidores_2023].[dbo].[VIEW_PRD_SCADA003]
-        WHERE ctranom LIKE 'SUPERVISOR%'
-          AND tracod = @codigo
+        WHERE (ctranom LIKE 'SUPERVISOR%' OR ctranom LIKE '%JEFE%')
+          AND RTRIM(LTRIM(tracod)) = @codigo
       `);
 
     if (!result.recordset || result.recordset.length === 0) {
+      console.warn(`Login fallido para codigo: '${codigoClean}'`);
       // e=2 -> código inválido / no autorizado
       return res.redirect(`${BASE_PATH}supervisor/login?e=2`);
     }
