@@ -65,7 +65,7 @@ export const fmtFullBr = (dt) => {
     hour12: true,
     timeZone: 'UTC'
   });
-  return `${fecha}<br>${hora}`;
+  return `${fecha}<span class="text-xs">${hora}</span>`;
 };
 
 export function toISO(dtLocalValue) {

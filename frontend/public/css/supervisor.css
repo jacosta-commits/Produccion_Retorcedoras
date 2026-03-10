@@ -229,6 +229,42 @@ body {
   transition: background 0.15s;
 }
 
+/* --------- Tablas Compactas (Resumen) --------- */
+.table-compact {
+  table-layout: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+.table-compact thead th {
+  padding: 8px 12px !important;
+  font-size: 0.75rem !important;
+  white-space: nowrap !important;
+  width: 1% !important;
+}
+
+.table-compact tbody td {
+  padding: 8px 12px !important;
+  font-size: 0.85rem !important;
+  line-height: 1.2 !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+  width: 1% !important;
+}
+
+.table-compact th:last-child,
+.table-compact td:last-child {
+  width: auto !important;
+}
+
+/* Utility para textos extra pequeños */
+.text-xs {
+  display: block;
+  font-size: 0.72rem !important;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
 .table tbody tr:last-child td {
   border-bottom: none;
 }
@@ -441,9 +477,9 @@ body {
     gap: 10px;
   }
 
-  .btn-edit-row {
-    padding: 2px 6px;
-    font-size: 0.85rem;
+  .table-compact tbody td {
+    padding: 4px 10px;
+    font-size: 0.8rem;
   }
 }
 
