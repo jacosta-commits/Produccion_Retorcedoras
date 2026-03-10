@@ -413,11 +413,22 @@ body {
   .table thead th {
     padding: 10px 12px;
     font-size: 0.7rem;
+    white-space: nowrap;
   }
 
   .table tbody td {
     padding: 10px 12px;
     font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .table {
+    min-width: 600px;
+  }
+
+  .table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
   }
 
   .pill {
