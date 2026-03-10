@@ -358,7 +358,7 @@ export const editarPlanFila = async (req, res) => {
     const { recordset: info } = await new sql.Request(tx)
       .input('id', sql.Int, id)
       .query(`
-        SELECT pd.programacion_id, pd.secuencia, t.minutos_por_descarga
+        SELECT pd.programacion_id, pd.secuencia, t.minutos_por_descarga, p.vinculo_id, p.lado_id
         FROM dbo.RET_DGT_PLAN_DESCARGAS pd
         JOIN dbo.RET_DGT_PROGRAMACIONES p ON p.programacion_id = pd.programacion_id
         JOIN dbo.RET_DGT_TITULOS t        ON t.titulo_id        = p.titulo_id
@@ -369,69 +369,84 @@ export const editarPlanFila = async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Fila de plan no encontrada' });
     }
 
-    const { programacion_id, secuencia, minutos_por_descarga } = info[0];
+    const { programacion_id, secuencia, minutos_por_descarga, vinculo_id, lado_id } = info[0];
     const mins = parseInt(minutos_por_descarga, 10);
 
-    // Parsear fecha "Face Value" (YYYY-MM-DDTHH:mm) a UTC Timestamp
-    // Esperamos formato ISO sin Z: "2026-01-26T10:00"
-    // Parsear fecha "Face Value" (d/m/Y H:i) a UTC Timestamp
-    // El frontend envía "26/01/2026 14:30"
+    // Parsear fecha inicio recibida
     let curIni;
     if (fh_inicio_plan.includes('/')) {
       const parts = fh_inicio_plan.split(' ');
       const dmy = parts[0].split('/');
       const hm = parts[1].split(':');
       curIni = new Date(Date.UTC(
-        parseInt(dmy[2], 10),
-        parseInt(dmy[1], 10) - 1,
-        parseInt(dmy[0], 10),
-        parseInt(hm[0], 10),
-        parseInt(hm[1], 10)
+        parseInt(dmy[2], 10), parseInt(dmy[1], 10) - 1, parseInt(dmy[0], 10),
+        parseInt(hm[0], 10), parseInt(hm[1], 10)
       ));
     } else if (fh_inicio_plan.includes('T')) {
       const parts = fh_inicio_plan.split('T');
       const ymd = parts[0].split('-');
       const hm = parts[1].split(':');
       curIni = new Date(Date.UTC(
-        parseInt(ymd[0], 10),
-        parseInt(ymd[1], 10) - 1,
-        parseInt(ymd[2], 10),
-        parseInt(hm[0], 10),
-        parseInt(hm[1], 10)
+        parseInt(ymd[0], 10), parseInt(ymd[1], 10) - 1, parseInt(ymd[2], 10),
+        parseInt(hm[0], 10), parseInt(hm[1], 10)
       ));
     } else {
       curIni = new Date(fh_inicio_plan);
     }
 
-    await new sql.Request(tx)
-      .input('id', sql.Int, id)
-      .input('ini', sql.DateTime, curIni)
-      .query(`
-        UPDATE dbo.RET_DGT_PLAN_DESCARGAS
-        SET fh_inicio_plan=@ini
-        WHERE plan_descarga_id=@id;
-      `);
+    const offsetMillis = curIni.getTime() - new Date().getTime(); // No es necesario, solo necesitamos curIni
 
-    const { recordset: siguientes } = await new sql.Request(tx)
+    // 1. Actualizar la fila actual y las siguientes en la MISMA programación
+    let loopIni = new Date(curIni);
+    const { recordset: filasAActualizar } = await new sql.Request(tx)
       .input('programacion_id', sql.Int, programacion_id)
       .input('secuencia', sql.Int, secuencia)
       .query(`
-        SELECT plan_descarga_id
+        SELECT plan_descarga_id, secuencia
         FROM dbo.RET_DGT_PLAN_DESCARGAS
-        WHERE programacion_id=@programacion_id AND secuencia > @secuencia
+        WHERE programacion_id=@programacion_id AND secuencia >= @secuencia
         ORDER BY secuencia;
       `);
 
-    for (const row of siguientes) {
-      curIni = addMinutes(curIni, mins);
+    for (const row of filasAActualizar) {
       await new sql.Request(tx)
         .input('id', sql.Int, row.plan_descarga_id)
-        .input('ini', sql.DateTime, curIni)
-        .query(`
-          UPDATE dbo.RET_DGT_PLAN_DESCARGAS
-          SET fh_inicio_plan=@ini
-          WHERE plan_descarga_id=@id;
-        `);
+        .input('ini', sql.DateTime, loopIni)
+        .query(`UPDATE dbo.RET_DGT_PLAN_DESCARGAS SET fh_inicio_plan=@ini WHERE plan_descarga_id=@id;`);
+      loopIni = addMinutes(loopIni, mins);
+    }
+
+    // 2. Si tiene VINCULO, actualizar el lado gemelo
+    if (vinculo_id) {
+      const { recordset: gemelo } = await new sql.Request(tx)
+        .input('vinculo', sql.UniqueIdentifier, vinculo_id)
+        .input('id', sql.Int, programacion_id)
+        .query(`SELECT programacion_id FROM dbo.RET_DGT_PROGRAMACIONES WHERE vinculo_id=@vinculo AND programacion_id != @id`);
+
+      if (gemelo.length) {
+        const gemelo_id = gemelo[0].programacion_id;
+        // El desfase es +mins si soy A (1) -> B (2), o -mins si soy B -> A
+        const offset = (lado_id === 1) ? mins : -mins;
+        let gemeloIni = addMinutes(new Date(curIni), offset);
+
+        const { recordset: filasGemelo } = await new sql.Request(tx)
+          .input('programacion_id', sql.Int, gemelo_id)
+          .input('secuencia', sql.Int, secuencia)
+          .query(`
+            SELECT plan_descarga_id, secuencia
+            FROM dbo.RET_DGT_PLAN_DESCARGAS
+            WHERE programacion_id=@programacion_id AND secuencia >= @secuencia
+            ORDER BY secuencia;
+          `);
+
+        for (const row of filasGemelo) {
+          await new sql.Request(tx)
+            .input('id', sql.Int, row.plan_descarga_id)
+            .input('ini', sql.DateTime, gemeloIni)
+            .query(`UPDATE dbo.RET_DGT_PLAN_DESCARGAS SET fh_inicio_plan=@ini WHERE plan_descarga_id=@id;`);
+          gemeloIni = addMinutes(gemeloIni, mins);
+        }
+      }
     }
 
     await tx.commit();
@@ -440,6 +455,7 @@ export const editarPlanFila = async (req, res) => {
   } catch (e) {
     console.error('editarPlanFila ERROR:', e);
     try { await tx.rollback(); } catch { }
+    return res.status(500).json({ ok: false, error: e.message });
   }
 };
 
@@ -460,12 +476,12 @@ export const editarPlan = async (req, res) => {
   try {
     await tx.begin();
 
-    // Obtener info de la programación
+    // 1. Obtener info de la programación a editar y sus vínculos
     const { recordset: info } = await new sql.Request(tx)
       .input('id', sql.Int, id)
       .query(`
         SELECT p.programacion_id, p.descargas_programadas, p.fecha_hora_inicio,
-               t.minutos_por_descarga
+               t.minutos_por_descarga, p.vinculo_id, p.lado_id
         FROM dbo.RET_DGT_PROGRAMACIONES p
         JOIN dbo.RET_DGT_TITULOS t ON t.titulo_id = p.titulo_id
         WHERE p.programacion_id = @id;
@@ -497,37 +513,57 @@ export const editarPlan = async (req, res) => {
       newInicio = new Date(prog.fecha_hora_inicio);
     }
 
-    // Borrar plan actual
-    await new sql.Request(tx)
-      .input('id', sql.Int, id)
-      .query('DELETE FROM dbo.RET_DGT_PLAN_DESCARGAS WHERE programacion_id=@id');
+    const idsParaActualizar = [{ id, inicio: newInicio }];
 
-    // Recrear plan
-    let curIni = new Date(newInicio);
-    for (let i = 1; i <= newDescargas; i++) {
-      await new sql.Request(tx)
-        .input('programacion_id', sql.Int, id)
-        .input('secuencia', sql.Int, i)
-        .input('fh_ini', sql.DateTime, curIni)
-        .input('mins', sql.Int, mins)
-        .query(`
-          INSERT INTO dbo.RET_DGT_PLAN_DESCARGAS
-            (programacion_id, secuencia, fh_inicio_plan, minutos_plan)
-          VALUES (@programacion_id, @secuencia, @fh_ini, @mins);
-        `);
-      curIni = addMinutes(curIni, mins);
+    // 2. Si tiene VINCULO, añadir el gemelo a la lista de actualización
+    if (prog.vinculo_id) {
+      const { recordset: gemelo } = await new sql.Request(tx)
+        .input('vinculo', sql.UniqueIdentifier, prog.vinculo_id)
+        .input('id', sql.Int, id)
+        .query(`SELECT programacion_id FROM dbo.RET_DGT_PROGRAMACIONES WHERE vinculo_id=@vinculo AND programacion_id != @id`);
+
+      if (gemelo.length) {
+        const gemelo_id = gemelo[0].programacion_id;
+        const offset = (prog.lado_id === 1) ? mins : -mins;
+        const inicioGemelo = addMinutes(new Date(newInicio), offset);
+        idsParaActualizar.push({ id: gemelo_id, inicio: inicioGemelo });
+      }
     }
 
-    // Actualizar programación padre
-    await new sql.Request(tx)
-      .input('id', sql.Int, id)
-      .input('descargas', sql.Int, newDescargas)
-      .input('inicio', sql.DateTime, newInicio)
-      .query(`
-        UPDATE dbo.RET_DGT_PROGRAMACIONES
-        SET descargas_programadas=@descargas, fecha_hora_inicio=@inicio
-        WHERE programacion_id=@id;
-      `);
+    // 3. Ejecutar la actualización para cada ID (el actual y su gemelo si existe)
+    for (const item of idsParaActualizar) {
+      // Borrar plan actual
+      await new sql.Request(tx)
+        .input('id', sql.Int, item.id)
+        .query('DELETE FROM dbo.RET_DGT_PLAN_DESCARGAS WHERE programacion_id=@id');
+
+      // Recrear plan
+      let curIni = new Date(item.inicio);
+      for (let i = 1; i <= newDescargas; i++) {
+        await new sql.Request(tx)
+          .input('programacion_id', sql.Int, item.id)
+          .input('secuencia', sql.Int, i)
+          .input('fh_ini', sql.DateTime, curIni)
+          .input('mins', sql.Int, mins)
+          .query(`
+            INSERT INTO dbo.RET_DGT_PLAN_DESCARGAS
+              (programacion_id, secuencia, fh_inicio_plan, minutos_plan)
+            VALUES (@programacion_id, @secuencia, @fh_ini, @mins);
+          `);
+        curIni = addMinutes(curIni, mins);
+      }
+
+      // Actualizar programación padre
+      await new sql.Request(tx)
+        .input('id', sql.Int, item.id)
+        .input('descargas', sql.Int, newDescargas)
+        .input('inicio', sql.DateTime, item.inicio)
+        .query(`
+          UPDATE dbo.RET_DGT_PROGRAMACIONES
+          SET descargas_programadas=@descargas, fecha_hora_inicio=@inicio
+          WHERE programacion_id=@id;
+        `);
+    }
 
     await tx.commit();
     return res.json({ ok: true });
