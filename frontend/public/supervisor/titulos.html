@@ -32,50 +32,22 @@
 
   <main class="page">
     <section class="card">
-      <div style="margin-bottom: 16px;">
-        <h2 style="font-size: 1.25rem; font-weight: 600; color: #fff; margin: 0;">Gestionar Títulos</h2>
-        <p style="color: var(--muted); font-size: 0.9rem; margin-top: 4px;">Crea nuevos títulos para asignar a las
-          máquinas.</p>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+        <div>
+          <h2 style="font-size: 1.25rem; font-weight: 600; color: #fff; margin: 0;">Gestionar Títulos</h2>
+          <p style="color: var(--muted); font-size: 0.9rem; margin-top: 4px;">Configura los tiempos y colores de cada
+            título.</p>
+        </div>
+        <button class="btn" id="btnNuevoTitulo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Nuevo Título
+        </button>
       </div>
 
-      <form id="frmTitulo" class="form-row" novalidate>
-        <input type="hidden" id="titulo_id" value="" />
-        <div class="field" style="flex: 1; min-width: 250px;">
-          <label for="nombre">Nombre del Título</label>
-          <input id="nombre" placeholder="Ej. 108 NY" required />
-        </div>
-
-        <div class="field" style="width: 140px;">
-          <label for="min">Min / Descarga</label>
-          <input id="min" type="number" min="1" step="1" placeholder="90" required />
-        </div>
-
-        <div class="field" style="display: flex; gap: 8px;">
-          <label style="visibility: hidden;">Action</label>
-          <button class="btn" type="submit" id="btnSubmit">
-            <svg id="iconAdd" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <svg id="iconEdit" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-              <path d="M12 20h9"></path>
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-            </svg>
-            <span id="btnSubmitText">Agregar</span>
-          </button>
-          <button class="btn" type="button" id="btnCancel"
-            style="display: none; background-color: var(--card-bg); border: 1px solid var(--border); color: var(--text);">
-            Cancelar
-          </button>
-        </div>
-      </form>
-      <div id="msg" class="muted" style="margin-top: 12px; font-size: 0.9rem;"></div>
-    </section>
-
-    <section class="card mt2">
-      <h3>Listado</h3>
       <div class="table-wrap">
         <div class="table-scroll">
           <table class="table">
@@ -83,6 +55,7 @@
               <tr>
                 <th>Título</th>
                 <th>Min/descarga</th>
+                <th style="width: 60px; text-align: center;">Color</th>
                 <th style="width: 100px; text-align: center;">Acciones</th>
               </tr>
             </thead>
@@ -91,6 +64,7 @@
         </div>
       </div>
     </section>
+
   </main>
 
   <!-- Footer con nombre del supervisor -->
@@ -110,6 +84,43 @@
       }
     })();
   </script>
+
+  <!-- Modal para Agregar/Editar Título -->
+  <div id="modalTitulo" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Nuevo Título</h3>
+      </div>
+      <form id="frmTitulo" novalidate>
+        <input type="hidden" id="titulo_id" value="" />
+
+        <div class="field">
+          <label for="nombre">Nombre del Título</label>
+          <input id="nombre" placeholder="Ej. 108 NY" required />
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="min">Min / Descarga</label>
+            <input id="min" type="number" min="1" step="1" placeholder="90" required />
+          </div>
+          <div class="field">
+            <label for="color">Color</label>
+            <input id="color" type="color" value="#ffffff" required style="height: 42px; padding: 4px;" />
+          </div>
+        </div>
+
+        <div id="msg" class="muted" style="margin-top: 12px; font-size: 0.9rem;"></div>
+
+        <div class="modal-footer">
+          <button class="btn ghost" type="button" id="btnCancel">Cancelar</button>
+          <button class="btn" type="submit" id="btnSubmit">
+            <span id="btnSubmitText">Guardar</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </body>
 
 </html>

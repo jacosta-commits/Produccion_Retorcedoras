@@ -52,6 +52,17 @@ function renderProgramaciones(list) {
   });
 }
 
+/* ------------------ Utils Visuales ------------------ */
+function getContrastYIQ(hexcolor) {
+  if (!hexcolor || hexcolor === 'transparent') return '#ffffff';
+  hexcolor = hexcolor.replace('#', '');
+  const r = parseInt(hexcolor.substr(0, 2), 16);
+  const g = parseInt(hexcolor.substr(2, 2), 16);
+  const b = parseInt(hexcolor.substr(4, 2), 16);
+  const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+  return (yiq >= 128) ? '#000000' : '#ffffff';
+}
+
 async function cargarDetalle(id) {
   CURRENT_PROG_ID = id;
   try {
@@ -83,14 +94,26 @@ function renderPlan(data) {
   tb.innerHTML = '';
 
   // Header Info
-  $('#hdrTitulo').textContent = data?.titulo ?? '—';
+  const hTitulo = $('#hdrTitulo');
+  hTitulo.textContent = data?.titulo ?? '—';
+
+  // Aplicar Color
+  if (data?.color) {
+    hTitulo.parentElement.style.backgroundColor = data.color;
+    hTitulo.parentElement.style.color = getContrastYIQ(data.color);
+    hTitulo.parentElement.style.borderColor = 'rgba(255,255,255,0.1)';
+  } else {
+    hTitulo.parentElement.style.backgroundColor = '';
+    hTitulo.parentElement.style.color = '';
+    hTitulo.parentElement.style.borderColor = '';
+  }
+
   $('#hdrTiempo').textContent = data?.minutos_por_descarga ?? '—';
   $('#hdrOT').textContent = data?.otcod ?? '—';
 
-  // Botón editar plan
+  // Modal editar plan
   const btnEdit = $('#btnEditPlan');
-  const editBar = $('#planEditBar');
-  editBar.style.display = 'none';
+  cerrarEditBar();
 
   const rows = data?.plan || [];
   if (!rows.length) {
@@ -173,10 +196,10 @@ async function actualizarFila(id, fechaFaceValue) {
   }
 }
 
-/* ------------------ Barra de Edición General ------------------ */
+/* ------------------ Modal de Edición General ------------------ */
 function abrirEditBar() {
-  const bar = $('#planEditBar');
-  bar.style.display = 'flex';
+  const bar = $('#modalEditPlan');
+  bar.classList.add('open');
 
   // Precargar datos actuales
   if (CURRENT_PLAN_DATA) {
@@ -185,7 +208,7 @@ function abrirEditBar() {
 }
 
 function cerrarEditBar() {
-  $('#planEditBar').style.display = 'none';
+  $('#modalEditPlan').classList.remove('open');
 }
 
 async function guardarPlanGeneral() {

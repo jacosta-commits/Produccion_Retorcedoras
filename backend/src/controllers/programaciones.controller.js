@@ -667,7 +667,8 @@ export const getProgramacionById = async (req, res) => {
           p.otcod,
           p.descargas_programadas,
           t.nombre AS titulo,
-          t.minutos_por_descarga
+          t.minutos_por_descarga,
+          t.color
         FROM dbo.RET_DGT_PROGRAMACIONES p
         JOIN dbo.RET_DGT_TITULOS t ON t.titulo_id = p.titulo_id
         WHERE p.programacion_id = @id
@@ -697,6 +698,7 @@ export const getProgramacionById = async (req, res) => {
       descargas_programadas: prog.descargas_programadas,
       titulo: prog.titulo,
       minutos_por_descarga: prog.minutos_por_descarga,
+      color: prog.color,
       plan
     });
 

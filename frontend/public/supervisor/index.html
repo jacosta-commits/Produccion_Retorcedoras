@@ -82,18 +82,6 @@
           Cant. Descargas</button>
       </div>
 
-      <!-- Barra de edición general (oculta por defecto) -->
-      <div id="planEditBar" class="plan-edit-bar" style="display:none">
-        <div class="field">
-          <label># Descargas</label>
-          <input id="editDescargas" type="number" min="1" step="1">
-        </div>
-        <div class="plan-edit-actions">
-          <button class="btn btn-sm" id="btnGuardarPlan">Regenerar Plan</button>
-          <button class="btn ghost btn-sm" id="btnCancelarPlan">Cancelar</button>
-        </div>
-      </div>
-
       <div class="table-wrap mt2">
         <div class="table-scroll">
           <table class="table">
@@ -141,6 +129,23 @@
       }
     })();
   </script>
+
+  <!-- Modal para Editar Cantidad de Descargas -->
+  <div id="modalEditPlan" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Editar Cantidad de Descargas</h3>
+      </div>
+      <div class="field">
+        <label># Descargas</label>
+        <input id="editDescargas" type="number" min="1" step="1">
+      </div>
+      <div class="modal-footer">
+        <button class="btn ghost" id="btnCancelarPlan">Cerrar</button>
+        <button class="btn" id="btnGuardarPlan">Regenerar Plan</button>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>
