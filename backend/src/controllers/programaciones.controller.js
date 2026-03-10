@@ -443,6 +443,102 @@ export const editarPlanFila = async (req, res) => {
   }
 };
 
+/* ----------- PUT /api/programaciones/:id/plan (edición general) ----------- */
+export const editarPlan = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { fh_inicio_plan, descargas } = req.body || {};
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ ok: false, error: 'ID inválido' });
+  }
+  if (!fh_inicio_plan && !descargas) {
+    return res.status(400).json({ ok: false, error: 'Nada que actualizar' });
+  }
+
+  const pool = await getPool();
+  const tx = new sql.Transaction(pool);
+
+  try {
+    await tx.begin();
+
+    // Obtener info de la programación
+    const { recordset: info } = await new sql.Request(tx)
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT p.programacion_id, p.descargas_programadas, p.fecha_hora_inicio,
+               t.minutos_por_descarga
+        FROM dbo.RET_DGT_PROGRAMACIONES p
+        JOIN dbo.RET_DGT_TITULOS t ON t.titulo_id = p.titulo_id
+        WHERE p.programacion_id = @id;
+      `);
+    if (!info.length) {
+      await tx.rollback();
+      return res.status(404).json({ ok: false, error: 'Programación no encontrada' });
+    }
+
+    const prog = info[0];
+    const mins = parseInt(prog.minutos_por_descarga, 10);
+    const newDescargas = descargas ? parseInt(descargas, 10) : prog.descargas_programadas;
+
+    // Parsear nueva fecha de inicio
+    let newInicio;
+    if (fh_inicio_plan) {
+      if (fh_inicio_plan.includes('T')) {
+        const parts = fh_inicio_plan.split('T');
+        const ymd = parts[0].split('-');
+        const hm = parts[1].split(':');
+        newInicio = new Date(Date.UTC(
+          parseInt(ymd[0], 10), parseInt(ymd[1], 10) - 1, parseInt(ymd[2], 10),
+          parseInt(hm[0], 10), parseInt(hm[1], 10)
+        ));
+      } else {
+        newInicio = new Date(fh_inicio_plan);
+      }
+    } else {
+      newInicio = new Date(prog.fecha_hora_inicio);
+    }
+
+    // Borrar plan actual
+    await new sql.Request(tx)
+      .input('id', sql.Int, id)
+      .query('DELETE FROM dbo.RET_DGT_PLAN_DESCARGAS WHERE programacion_id=@id');
+
+    // Recrear plan
+    let curIni = new Date(newInicio);
+    for (let i = 1; i <= newDescargas; i++) {
+      await new sql.Request(tx)
+        .input('programacion_id', sql.Int, id)
+        .input('secuencia', sql.Int, i)
+        .input('fh_ini', sql.DateTime, curIni)
+        .input('mins', sql.Int, mins)
+        .query(`
+          INSERT INTO dbo.RET_DGT_PLAN_DESCARGAS
+            (programacion_id, secuencia, fh_inicio_plan, minutos_plan)
+          VALUES (@programacion_id, @secuencia, @fh_ini, @mins);
+        `);
+      curIni = addMinutes(curIni, mins);
+    }
+
+    // Actualizar programación padre
+    await new sql.Request(tx)
+      .input('id', sql.Int, id)
+      .input('descargas', sql.Int, newDescargas)
+      .input('inicio', sql.DateTime, newInicio)
+      .query(`
+        UPDATE dbo.RET_DGT_PROGRAMACIONES
+        SET descargas_programadas=@descargas, fecha_hora_inicio=@inicio
+        WHERE programacion_id=@id;
+      `);
+
+    await tx.commit();
+    return res.json({ ok: true });
+
+  } catch (e) {
+    console.error('editarPlan ERROR:', e);
+    try { await tx.rollback(); } catch { }
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+};
+
 /* -------------------- DELETE /api/programaciones/:id ---------------------- */
 export const deleteProgramacion = async (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -569,6 +665,7 @@ export const getProgramacionById = async (req, res) => {
         SELECT 
           p.programacion_id,
           p.otcod,
+          p.descargas_programadas,
           t.nombre AS titulo,
           t.minutos_por_descarga
         FROM dbo.RET_DGT_PROGRAMACIONES p
@@ -597,6 +694,7 @@ export const getProgramacionById = async (req, res) => {
       ok: true,
       programacion_id: prog.programacion_id,
       otcod: prog.otcod,
+      descargas_programadas: prog.descargas_programadas,
       titulo: prog.titulo,
       minutos_por_descarga: prog.minutos_por_descarga,
       plan

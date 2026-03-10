@@ -18,12 +18,16 @@ function fmtDT(v) {
   const d = new Date(v);
   if (isNaN(d)) return String(v);
   // FIX TIMEZONE: Mostrar valor facial UTC
-  return d.toLocaleString('es-PE', {
+  const fecha = d.toLocaleDateString('es-PE', {
     day: '2-digit', month: '2-digit', year: 'numeric',
+    timeZone: 'UTC'
+  });
+  const hora = d.toLocaleTimeString('es-PE', {
     hour: '2-digit', minute: '2-digit',
     hour12: false,
     timeZone: 'UTC'
   });
+  return `${fecha}<br>${hora}`;
 }
 
 // Filtro de filas futuras por F.H. FINAL

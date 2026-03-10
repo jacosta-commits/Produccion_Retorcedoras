@@ -51,6 +51,23 @@ export const fmtFull = (dt) => {
   });
 };
 
+/** Fecha y hora separadas por <br> para celdas de tabla */
+export const fmtFullBr = (dt) => {
+  if (!dt) return '—';
+  const d = (dt instanceof Date) ? dt : new Date(dt);
+  if (isNaN(d)) return '—';
+  const fecha = d.toLocaleDateString('es-PE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    timeZone: 'UTC'
+  });
+  const hora = d.toLocaleTimeString('es-PE', {
+    hour: '2-digit', minute: '2-digit',
+    hour12: true,
+    timeZone: 'UTC'
+  });
+  return `${fecha}<br>${hora}`;
+};
+
 export function toISO(dtLocalValue) {
   // dtLocalValue: '2025-10-29T05:30'
   if (!dtLocalValue) return null;

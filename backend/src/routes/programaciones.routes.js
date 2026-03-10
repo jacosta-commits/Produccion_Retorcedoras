@@ -4,6 +4,7 @@ import {
   crearProgramacion,
   getPlanVigente,
   editarPlanFila,
+  editarPlan,
   deleteProgramacion,
   getProgramacionesActivas,
   getProgramacionById
@@ -13,9 +14,10 @@ const r = Router();
 
 r.post('/', crearProgramacion);
 r.get('/vigente', getPlanVigente);
-r.get('/activas', getProgramacionesActivas); // Nueva ruta para listar
-r.get('/:id', getProgramacionById);          // Nueva ruta para detalle
-r.delete('/:id', deleteProgramacion);        // Nueva ruta para borrar
-r.put('/plan/:plan_descarga_id', editarPlanFila);
+r.get('/activas', getProgramacionesActivas);
+r.get('/:id', getProgramacionById);
+r.delete('/:id', deleteProgramacion);
+r.put('/:id/plan', editarPlan);               // Edición general del plan
+r.put('/plan/:plan_descarga_id', editarPlanFila); // Edición de fila individual
 
 export default r;

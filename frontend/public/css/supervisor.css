@@ -4,6 +4,7 @@
 
 :root {
   --sup-header-h: 64px;
+  --sup-footer-h: 36px;
 }
 
 /* Tipografía base */
@@ -11,6 +12,11 @@ html,
 body {
   font-size: 15px;
   line-height: 1.5;
+}
+
+/* Espacio inferior para que el footer fijo no tape contenido */
+body {
+  padding-bottom: var(--sup-footer-h);
 }
 
 .page {
@@ -47,7 +53,7 @@ body {
 .form-row {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   align-items: end;
 }
 
@@ -55,6 +61,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .field label {
@@ -172,6 +179,7 @@ body {
   border-radius: 999px;
   font-size: 0.9rem;
   font-weight: 500;
+  min-width: 0;
 }
 
 .pill strong {
@@ -256,7 +264,6 @@ body {
   padding: 0 24px;
   height: var(--sup-header-h);
   background: rgba(2, 6, 23, 0.8);
-  /* Slate 950 alpha */
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
 }
@@ -265,6 +272,7 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
 }
 
 .brand {
@@ -273,16 +281,31 @@ body {
   letter-spacing: -0.02em;
 }
 
-.sup-user {
+/* --------- Footer Supervisor (Nombre + Logout) --------- */
+.sup-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
   display: flex;
   align-items: center;
-  gap: 16px;
-  font-size: 0.9rem;
+  justify-content: center;
+  padding: 0 24px;
+  height: var(--sup-footer-h);
+  background: rgba(2, 6, 23, 0.85);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
 }
 
-.sup-name {
+.sup-footer .sup-name {
   font-weight: 500;
+  font-size: 0.8rem;
   color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .sup-logout {
@@ -294,6 +317,8 @@ body {
   font-size: 0.85rem;
   text-decoration: none;
   transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .sup-logout:hover {
@@ -314,6 +339,7 @@ body {
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .hamburger span {
@@ -329,7 +355,7 @@ body {
   top: var(--sup-header-h);
   left: -280px;
   width: 260px;
-  height: calc(100vh - var(--sup-header-h));
+  height: calc(100vh - var(--sup-header-h) - var(--sup-footer-h));
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(12px);
   border-right: 1px solid var(--line);
@@ -365,55 +391,134 @@ body {
   font-weight: 600;
 }
 
-/* Responsive */
+/* --------- Responsive --------- */
 @media (max-width: 768px) {
   .sup-header {
     padding: 0 16px;
   }
 
-  .sup-user {
-    display: none;
+  .sup-footer {
+    padding: 0 16px;
   }
 
-  /* Ocultar user en header móvil si quieres simplificar */
-  /* O mostrarlo abajo del drawer */
+  .page {
+    padding: 0 12px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .table thead th {
+    padding: 10px 12px;
+    font-size: 0.7rem;
+  }
+
+  .table tbody td {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+
+  .pill {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  .plan-edit-bar {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .btn-edit-row {
+    padding: 2px 6px;
+    font-size: 0.85rem;
+  }
 }
 
-/* --------- Input Fecha Tabla (Moderno) --------- */
-.input-fecha-tabla {
+/* --------- Botón lápiz por fila --------- */
+.btn-edit-row {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--text);
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 0.9rem;
-  padding: 6px 10px;
-  border-radius: 8px;
+  color: var(--muted);
+  font-size: 1rem;
   cursor: pointer;
-  width: 100%;
-  max-width: 220px;
+  padding: 4px 8px;
+  border-radius: 6px;
   transition: all 0.2s ease;
+  line-height: 1;
 }
 
-.input-fecha-tabla:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+.btn-edit-row:hover {
+  color: var(--accent-from);
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.25);
 }
 
-.input-fecha-tabla:focus {
-  background: rgba(15, 23, 42, 0.9);
-  border-color: var(--accent-from);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+.btn-edit-row:active {
+  background: rgba(59, 130, 246, 0.2);
 }
 
-/* Icono del calendario (invertido para dark mode) */
-.input-fecha-tabla::-webkit-calendar-picker-indicator {
-  filter: invert(0.8);
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
+/* Ocultar el input falso que genera flatpickr al anclarse al botón */
+.btn-edit-row .flatpickr-wrapper,
+.btn-edit-row input.flatpickr-input {
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
 }
 
-.input-fecha-tabla::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
+/* --------- Botón pequeño --------- */
+.btn-sm {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 0.82rem;
+  border-radius: 8px;
+}
+
+/* --------- Barra de edición general del plan --------- */
+.plan-edit-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  margin-top: 12px;
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  animation: fadeSlideIn 0.2s ease;
+}
+
+.plan-edit-bar .field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.plan-edit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fila activa en tabla de programaciones */
+.table tbody tr.table-active td {
+  background: rgba(59, 130, 246, 0.08);
 }

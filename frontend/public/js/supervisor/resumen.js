@@ -1,7 +1,12 @@
 // frontend/public/js/supervisor/resumen.js
-import { api, fmtFull } from './_lib.js';
+import { api, fmtFull, fmtFullBr } from './_lib.js';
 
 const $ = s => document.querySelector(s);
+
+/* ---- Estado actual ---- */
+let CURRENT_PROG_ID = null;   // programacion_id seleccionada
+let CURRENT_PLAN_DATA = null; // datos completos del plan cargado
+let editFp = null;            // instancia flatpickr de la barra de edición
 
 /* ------------------ Renderizado de Lista de Programaciones ------------------ */
 function renderProgramaciones(list) {
@@ -17,35 +22,29 @@ function renderProgramaciones(list) {
   sec.style.display = 'block';
   list.forEach(p => {
     const tr = document.createElement('tr');
-    tr.style.cursor = 'pointer'; // Indicar que es clickeable
+    tr.style.cursor = 'pointer';
     tr.dataset.id = p.programacion_id;
 
     tr.innerHTML = `
       <td>${p.otcod}</td>
       <td>${p.titulo}</td>
-      <td>${fmtFull(p.inicio)}</td>
-      <td>${fmtFull(p.fin)}</td>
+      <td>${fmtFullBr(p.inicio)}</td>
+      <td>${fmtFullBr(p.fin)}</td>
       <td>
         <button class="btn-danger btn-sm" data-id="${p.programacion_id}">Eliminar</button>
       </td>
     `;
 
-    // Click en la fila para ver detalle
     tr.addEventListener('click', (e) => {
-      // Evitar que el click en "Eliminar" dispare la carga del detalle
       if (e.target.tagName === 'BUTTON') return;
-
-      // Resaltar fila seleccionada
       tb.querySelectorAll('tr').forEach(r => r.classList.remove('table-active'));
       tr.classList.add('table-active');
-
       cargarDetalle(p.programacion_id);
     });
 
-    // Bind delete
     const btn = tr.querySelector('button');
     btn.addEventListener('click', (e) => {
-      e.stopPropagation(); // Prevenir propagación al TR
+      e.stopPropagation();
       eliminarProgramacion(p.programacion_id);
     });
 
@@ -54,18 +53,16 @@ function renderProgramaciones(list) {
 }
 
 async function cargarDetalle(id) {
+  CURRENT_PROG_ID = id;
   try {
     const r = await api.get(`/api/programaciones/${id}`);
     if (r.ok) {
-      renderPlan({
-        titulo: r.titulo,
-        minutos_por_descarga: r.minutos_por_descarga,
-        otcod: r.otcod,
-        plan: r.plan
-      });
+      CURRENT_PLAN_DATA = r;
+      renderPlan(r);
     }
   } catch (e) {
     console.error('Error cargando detalle:', e);
+    CURRENT_PLAN_DATA = null;
     renderPlan(null);
   }
 }
@@ -74,95 +71,99 @@ async function eliminarProgramacion(id) {
   if (!confirm('¿Estás seguro de eliminar esta programación y todo su plan?')) return;
   try {
     await api.delete(`/api/programaciones/${id}`);
-    await cargar(); // Recargar todo
+    await cargar();
   } catch (e) {
     alert('Error al eliminar: ' + e.message);
   }
 }
 
-/* ------------------ Renderizado de Plan Detallado (Vigente) ------------------ */
-function renderPlan(plan) {
+/* ------------------ Renderizado de Plan Detallado ------------------ */
+function renderPlan(data) {
   const tb = $('#tbPlan');
   tb.innerHTML = '';
 
   // Header Info
-  $('#hdrTitulo').textContent = plan?.titulo ?? '—';
-  $('#hdrTiempo').textContent = plan?.minutos_por_descarga ?? '—';
-  $('#hdrOT').textContent = plan?.otcod ?? '—';
+  $('#hdrTitulo').textContent = data?.titulo ?? '—';
+  $('#hdrTiempo').textContent = data?.minutos_por_descarga ?? '—';
+  $('#hdrOT').textContent = data?.otcod ?? '—';
 
-  const rows = plan?.plan || [];
+  // Botón editar plan
+  const btnEdit = $('#btnEditPlan');
+  const editBar = $('#planEditBar');
+  editBar.style.display = 'none';
+
+  const rows = data?.plan || [];
   if (!rows.length) {
-    tb.innerHTML = '<tr><td colspan="3" class="muted">Seleccione una programación para ver el detalle.</td></tr>';
+    btnEdit.style.display = 'none';
+    tb.innerHTML = '<tr><td colspan="4" class="muted">Seleccione una programación para ver el detalle.</td></tr>';
     return;
   }
+
+  btnEdit.style.display = 'inline-flex';
 
   rows.forEach(r => {
     const tr = document.createElement('tr');
 
-    // Convertir fecha UTC/ISO a Date
-    // Asumimos que r.fh_inicio viene en ISO UTC (Z).
-    // Queremos mostrar "Face Value" (lo que dice la BD, tal cual, sin restar 5h).
-    // Si BD dice 12:00Z, queremos mostrar 12:00 en el input.
-    // Para lograrlo, creamos una fecha local que tenga los mismos componentes que la UTC.
-    const dUTC = new Date(r.fh_inicio);
-    const dFace = new Date(
-      dUTC.getUTCFullYear(),
-      dUTC.getUTCMonth(),
-      dUTC.getUTCDate(),
-      dUTC.getUTCHours(),
-      dUTC.getUTCMinutes()
-    );
-
     tr.innerHTML = `
       <td>${r.secuencia}</td>
+      <td>${fmtFullBr(r.fh_inicio)}</td>
+      <td>${fmtFullBr(r.fh_fin)}</td>
       <td>
-        <input type="text" class="form-control form-control-sm input-fecha-tabla flatpickr-input" 
-               data-id="${r.plan_descarga_id}" readonly="readonly">
+        <button class="btn-edit-row" title="Editar fecha de inicio" data-id="${r.plan_descarga_id}">✎</button>
       </td>
-      <td>${fmtFull(r.fh_fin)}</td>
     `;
 
-    // Init Flatpickr en el input
-    const input = tr.querySelector('input');
-    flatpickr(input, {
-      defaultDate: dFace, // Pasamos el objeto Date ajustado
-      enableTime: true,
-      dateFormat: "d/m/Y h:i K", // Formato visual AM/PM
-      time_24hr: false,
-      locale: "es",
-      onClose: async (selectedDates, dateStr, instance) => {
-        if (!dateStr || !selectedDates.length) return;
+    // Lápiz por fila → abre flatpickr para editar esa fecha individual
+    const btnRow = tr.querySelector('.btn-edit-row');
 
-        // Convertir la fecha seleccionada a string "YYYY-MM-DDTHH:mm" (Face Value)
-        // Flatpickr selectedDates[0] es un objeto Date (local).
-        // Queremos enviar "2026-01-26T10:00" tal cual se ve.
+    // Crear fecha "face value" para flatpickr
+    const dUTC = new Date(r.fh_inicio);
+    const dFace = new Date(
+      dUTC.getUTCFullYear(), dUTC.getUTCMonth(), dUTC.getUTCDate(),
+      dUTC.getUTCHours(), dUTC.getUTCMinutes()
+    );
+
+    // Creamos un input oculto real, para que flatpickr se conecte
+    const ghost = document.createElement('input');
+    ghost.type = 'text';
+    ghost.style.display = 'none'; // ¡100% oculto!
+    btnRow.parentElement.appendChild(ghost);
+
+    const fp = flatpickr(ghost, {
+      defaultDate: dFace,
+      enableTime: true,
+      dateFormat: 'd/m/Y h:i K',
+      time_24hr: false,
+      locale: 'es',
+      disableMobile: true, // <-- CRUCIAL: Evita que el navegador dibuje su input de fecha nativo (que ignora CSS)
+      positionElement: btnRow, // Posiciona el calendario en el lápiz
+      onClose: async (selectedDates) => {
+        if (!selectedDates.length) return;
         const d = selectedDates[0];
         const pad = n => String(n).padStart(2, '0');
         const faceValue = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-
         await actualizarFila(r.plan_descarga_id, faceValue);
       }
+    });
+
+    // Abrimos el calendario al tocar el lápiz
+    btnRow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fp.open();
     });
 
     tb.appendChild(tr);
   });
 }
 
+/* ------------------ Actualizar fila individual ------------------ */
 async function actualizarFila(id, fechaFaceValue) {
   try {
-    // fechaFaceValue es "2026-01-26T10:00"
     const res = await api.put(`/api/programaciones/plan/${id}`, {
       fh_inicio_plan: fechaFaceValue
     });
-
-    if (res.ok) {
-      // Recargar el detalle actual para ver los cambios recalculados
-      // Necesitamos el ID de la programación padre. 
-      // Lo podemos sacar de la fila seleccionada en la tabla de arriba.
-      const selectedRow = document.querySelector('#tbProgramaciones tr.table-active');
-      if (selectedRow && selectedRow.dataset.id) {
-        await cargarDetalle(selectedRow.dataset.id);
-      }
+    if (res.ok && CURRENT_PROG_ID) {
+      await cargarDetalle(CURRENT_PROG_ID);
     } else {
       alert('Error al actualizar: ' + (res.error || 'Desconocido'));
     }
@@ -172,28 +173,71 @@ async function actualizarFila(id, fechaFaceValue) {
   }
 }
 
+/* ------------------ Barra de Edición General ------------------ */
+function abrirEditBar() {
+  const bar = $('#planEditBar');
+  bar.style.display = 'flex';
+
+  // Precargar datos actuales
+  if (CURRENT_PLAN_DATA) {
+    $('#editDescargas').value = CURRENT_PLAN_DATA.descargas_programadas || '';
+  }
+}
+
+function cerrarEditBar() {
+  $('#planEditBar').style.display = 'none';
+}
+
+async function guardarPlanGeneral() {
+  if (!CURRENT_PROG_ID) return;
+
+  const descargas = parseInt($('#editDescargas').value, 10);
+  if (!Number.isFinite(descargas) || descargas < 1) {
+    alert('Ingrese un número válido de descargas');
+    return;
+  }
+
+  try {
+    const res = await api.put(`/api/programaciones/${CURRENT_PROG_ID}/plan`, {
+      descargas
+    });
+
+    if (res.ok) {
+      cerrarEditBar();
+      await cargarDetalle(CURRENT_PROG_ID);
+      // También refrescar la lista de arriba por si cambiaron las fechas
+      await cargar();
+    } else {
+      alert('Error: ' + (res.error || 'Desconocido'));
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Error al guardar: ' + e.message);
+  }
+}
+
 /* ------------------ Carga de Datos ------------------ */
 async function cargar() {
   const maquina_id = $('#selMaquina').value;
   const lado_id = $('#selLado').value;
   if (!maquina_id || !lado_id) return;
 
+  cerrarEditBar();
+
   try {
-    // 1. Cargar lista de programaciones activas
     const activas = await api.get(`/api/programaciones/activas?maquina_id=${maquina_id}&lado_id=${lado_id}`)
       .catch(() => []);
 
     renderProgramaciones(activas);
 
-    // 2. Por defecto, cargar detalle de la primera (o limpiar si no hay)
     if (activas.length) {
-      // Simular click en la primera fila para cargar detalle y marcar activo
       const firstRow = $('#tbProgramaciones tr');
       if (firstRow) firstRow.click();
     } else {
+      CURRENT_PROG_ID = null;
+      CURRENT_PLAN_DATA = null;
       renderPlan(null);
     }
-
   } catch (e) {
     console.error(e);
   }
@@ -225,6 +269,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#selMaquina').addEventListener('change', cargar);
   $('#selLado').addEventListener('change', cargar);
   $('#btnRefresh').addEventListener('click', cargar);
+
+  // Botones de edición general
+  $('#btnEditPlan').addEventListener('click', abrirEditBar);
+  $('#btnCancelarPlan').addEventListener('click', cerrarEditBar);
+  $('#btnGuardarPlan').addEventListener('click', guardarPlanGeneral);
 
   await cargar();
 });
